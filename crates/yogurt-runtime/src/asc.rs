@@ -385,22 +385,28 @@ impl FromAscPtr for u32 {
 #[cfg(target_arch = "wasm32")]
 #[inline]
 pub unsafe fn read_u32_at(base: u32, offset: usize) -> u32 {
-    let ptr = (base as *const u8).add(offset) as *const u32;
-    core::ptr::read_unaligned(ptr)
+    unsafe {
+        let ptr = (base as *const u8).add(offset) as *const u32;
+        core::ptr::read_unaligned(ptr)
+    }
 }
 
 /// Read a u64 from AS memory at the given offset from a base pointer.
 #[cfg(target_arch = "wasm32")]
 #[inline]
 pub unsafe fn read_u64_at(base: u32, offset: usize) -> u64 {
-    let ptr = (base as *const u8).add(offset) as *const u64;
-    core::ptr::read_unaligned(ptr)
+    unsafe {
+        let ptr = (base as *const u8).add(offset) as *const u64;
+        core::ptr::read_unaligned(ptr)
+    }
 }
 
 /// Read an i32 from AS memory at the given offset from a base pointer.
 #[cfg(target_arch = "wasm32")]
 #[inline]
 pub unsafe fn read_i32_at(base: u32, offset: usize) -> i32 {
-    let ptr = (base as *const u8).add(offset) as *const i32;
-    core::ptr::read_unaligned(ptr)
+    unsafe {
+        let ptr = (base as *const u8).add(offset) as *const i32;
+        core::ptr::read_unaligned(ptr)
+    }
 }

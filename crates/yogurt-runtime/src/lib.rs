@@ -11,7 +11,7 @@ extern crate alloc;
 mod allocator;
 pub mod asc;
 mod host;
-mod types;
+pub mod types;
 
 pub mod crypto;
 pub mod data_source;

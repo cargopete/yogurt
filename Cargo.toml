@@ -6,6 +6,9 @@ members = [
     "crates/yogurt-codegen",
     "crates/yogurt-macros",
 ]
+exclude = [
+    "tests/integration/erc20-transfer",
+]
 
 [workspace.package]
 version = "0.1.0"

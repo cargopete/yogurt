@@ -124,12 +124,12 @@ pub struct BigInt {
 
 impl BigInt {
     /// Create a BigInt from an AscPtr (internal use).
-    pub(crate) fn from_ptr(ptr: AscPtr<crate::asc::AscBytes>) -> Self {
+    pub fn from_ptr(ptr: AscPtr<crate::asc::AscBytes>) -> Self {
         Self { ptr }
     }
 
     /// Get the internal pointer.
-    pub(crate) fn as_ptr(&self) -> AscPtr<crate::asc::AscBytes> {
+    pub fn as_ptr(&self) -> AscPtr<crate::asc::AscBytes> {
         self.ptr
     }
 
@@ -492,12 +492,12 @@ pub struct BigDecimal {
 
 impl BigDecimal {
     /// Create a BigDecimal from an AscPtr (internal use).
-    pub(crate) fn from_ptr(ptr: AscPtr<crate::asc::AscBytes>) -> Self {
+    pub fn from_ptr(ptr: AscPtr<crate::asc::AscBytes>) -> Self {
         Self { ptr }
     }
 
     /// Get the internal pointer.
-    pub(crate) fn as_ptr(&self) -> AscPtr<crate::asc::AscBytes> {
+    pub fn as_ptr(&self) -> AscPtr<crate::asc::AscBytes> {
         self.ptr
     }
 

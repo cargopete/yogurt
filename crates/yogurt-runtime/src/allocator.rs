@@ -136,3 +136,55 @@ pub unsafe fn read_rt_size(ptr: u32) -> u32 {
     let header_ptr = (ptr - 4) as *const u32;
     unsafe { core::ptr::read_unaligned(header_ptr) }
 }
+
+// ============================================================================
+// Global Allocator for no_std builds
+// ============================================================================
+
+/// A simple bump allocator for use as the global allocator in no_std WASM.
+///
+/// This allocator never frees memory, which is acceptable for subgraph handlers
+/// since each handler invocation typically runs in a fresh WASM instance.
+#[cfg(all(target_arch = "wasm32", not(feature = "std")))]
+pub struct WasmBumpAllocator;
+
+#[cfg(all(target_arch = "wasm32", not(feature = "std")))]
+unsafe impl core::alloc::GlobalAlloc for WasmBumpAllocator {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        // Use our existing bump allocator (without the AS header)
+        // We allocate raw memory here, not AS objects
+        ensure_heap_initialised();
+
+        let size = layout.size() as u32;
+        let align = layout.align() as u32;
+
+        // Get current heap pointer and align it
+        let mut ptr = HEAP_PTR.load(Ordering::Relaxed);
+        let aligned_ptr = (ptr + align - 1) & !(align - 1);
+
+        let new_ptr = aligned_ptr + size;
+
+        // Check if we need to grow memory
+        let pages_needed = (new_ptr + 65535) / 65536;
+        let current_pages = core::arch::wasm32::memory_size(0) as u32;
+
+        if pages_needed > current_pages {
+            let grow = pages_needed - current_pages;
+            if core::arch::wasm32::memory_grow(0, grow as usize) == usize::MAX {
+                return core::ptr::null_mut();
+            }
+        }
+
+        HEAP_PTR.store(new_ptr, Ordering::Relaxed);
+        aligned_ptr as *mut u8
+    }
+
+    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: core::alloc::Layout) {
+        // Bump allocator never frees — this is fine for short-lived handlers
+    }
+}
+
+/// The global allocator instance for no_std WASM builds.
+#[cfg(all(target_arch = "wasm32", not(feature = "std")))]
+#[global_allocator]
+pub static ALLOCATOR: WasmBumpAllocator = WasmBumpAllocator;
