@@ -7,7 +7,7 @@
 #[cfg(target_arch = "wasm32")]
 mod imports {
     #[link(wasm_import_module = "env")]
-    extern "C" {
+    unsafe extern "C" {
         // Store operations
         #[link_name = "store.get"]
         pub fn store_get(entity_type: i32, id: i32) -> i32;

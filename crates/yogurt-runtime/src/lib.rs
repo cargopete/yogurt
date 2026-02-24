@@ -37,7 +37,7 @@ pub mod prelude {
     pub use crate::{data_source, log};
 
     // Re-export the handler macro when available
-    #[cfg(feature = "macros")]
+    #[cfg(feature = "yogurt-macros")]
     pub use yogurt_macros::handler;
 }
 
@@ -52,22 +52,22 @@ mod wasm {
     }
 
     // AssemblyScript runtime exports required by graph-node
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn abort(_msg: u32, _file: u32, _line: u32, _col: u32) -> ! {
         core::arch::wasm32::unreachable()
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn __pin(ptr: u32) -> u32 {
         ptr // No-op: we use bump allocation, no GC
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn __unpin(_ptr: u32) {
         // No-op: we use bump allocation, no GC
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn __collect() {
         // No-op: we use bump allocation, no GC
     }

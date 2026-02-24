@@ -86,7 +86,7 @@ impl<T> AscPtr<T> {
 #[derive(Debug)]
 pub struct AscString;
 
-/// Marker type for AssemblyScript byte arrays
+/// Marker type for AssemblyScript byte arrays (ArrayBuffer)
 #[derive(Debug)]
 pub struct AscBytes;
 
@@ -98,9 +98,85 @@ pub struct AscTypedArray<T>(PhantomData<T>);
 #[derive(Debug)]
 pub struct AscArray<T>(PhantomData<T>);
 
-/// Marker type for entity data
+/// Marker type for entity data (TypedMap<String, StoreValue>)
 #[derive(Debug)]
 pub struct AscEntity;
+
+/// Marker type for TypedMapEntry<K, V>
+#[derive(Debug)]
+pub struct AscTypedMapEntry<K, V>(PhantomData<(K, V)>);
+
+/// Marker type for StoreValue enum
+#[derive(Debug)]
+pub struct AscStoreValue;
+
+// ============================================================================
+// AssemblyScript Memory Layout Structures
+// ============================================================================
+
+/// AssemblyScript Array layout (API version 0.0.5+)
+///
+/// Memory layout (after 20-byte header):
+/// - buffer: AscPtr<ArrayBuffer>  (4 bytes)
+/// - buffer_data_start: u32       (4 bytes)
+/// - buffer_data_length: u32      (4 bytes)
+/// - length: i32                  (4 bytes)
+#[repr(C)]
+pub struct AscArrayHeader {
+    pub buffer: u32,
+    pub buffer_data_start: u32,
+    pub buffer_data_length: u32,
+    pub length: i32,
+}
+
+/// AssemblyScript TypedMap layout
+///
+/// Memory layout (after 20-byte header):
+/// - entries: AscPtr<Array<AscPtr<TypedMapEntry>>>  (4 bytes)
+#[repr(C)]
+pub struct AscTypedMapHeader {
+    pub entries: u32,
+}
+
+/// AssemblyScript TypedMapEntry layout
+///
+/// Memory layout (after 20-byte header):
+/// - key: AscPtr<K>    (4 bytes)
+/// - value: AscPtr<V>  (4 bytes)
+#[repr(C)]
+pub struct AscTypedMapEntryHeader {
+    pub key: u32,
+    pub value: u32,
+}
+
+/// AssemblyScript Enum layout (for StoreValue)
+///
+/// Memory layout (after 20-byte header):
+/// - kind: i32         (4 bytes) - discriminant
+/// - _padding: u32     (4 bytes) - alignment padding
+/// - payload: u64      (8 bytes) - value (pointer or inline primitive)
+#[repr(C)]
+pub struct AscEnumHeader {
+    pub kind: i32,
+    pub _padding: u32,
+    pub payload: u64,
+}
+
+/// StoreValue discriminant values (from graph-ts ValueKind)
+#[repr(i32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StoreValueKind {
+    String = 0,
+    Int = 1,
+    BigDecimal = 2,
+    Bool = 3,
+    Array = 4,
+    Null = 5,
+    Bytes = 6,
+    BigInt = 7,
+    Int8 = 8,
+    Timestamp = 9,
+}
 
 /// Convert a Rust string to an AssemblyScript string in WASM memory.
 ///

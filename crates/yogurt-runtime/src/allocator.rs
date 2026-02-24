@@ -18,11 +18,21 @@ use core::sync::atomic::{AtomicU32, Ordering};
 pub const HEADER_SIZE: u32 = 20;
 
 /// Hardcoded AssemblyScript runtime type IDs
+///
+/// The first three are fixed by the AS runtime. Others are assigned
+/// sequentially by the compiler, but we use stable IDs for our generated types.
 pub mod class_id {
     pub const OBJECT: u32 = 0;
     pub const ARRAY_BUFFER: u32 = 1;
     pub const STRING: u32 = 2;
-    // Other type IDs are assigned by codegen and stored in __rtti_base
+
+    // Array types - IDs chosen to avoid conflicts with codegen
+    // These start at a high number to leave room for user-defined types
+    pub const ARRAY_PTR: u32 = 1000;           // Array<AscPtr<T>>
+    pub const TYPED_MAP: u32 = 1001;           // TypedMap<K, V>
+    pub const TYPED_MAP_ENTRY: u32 = 1002;     // TypedMapEntry<K, V>
+    pub const STORE_VALUE: u32 = 1003;         // Enum<StoreValueKind>
+    pub const ARRAY_STORE_VALUE: u32 = 1004;   // Array<StoreValue>
 }
 
 /// Current heap pointer for bump allocation
@@ -37,7 +47,7 @@ fn ensure_heap_initialised() {
     if HEAP_BASE.load(Ordering::Relaxed) == 0 {
         // Start heap after the data segment
         // __heap_base is provided by wasm-ld
-        extern "C" {
+        unsafe extern "C" {
             static __heap_base: u8;
         }
         let base = unsafe { &__heap_base as *const u8 as u32 };
@@ -109,7 +119,7 @@ pub fn asc_alloc(_size: u32, _class_id: u32) -> u32 {
 
 /// The `__new` export required by graph-node.
 /// Signature: `(size: i32, classId: i32) -> i32`
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[cfg(target_arch = "wasm32")]
 pub extern "C" fn __new(size: i32, class_id: i32) -> i32 {
     asc_alloc(size as u32, class_id as u32) as i32
