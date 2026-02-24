@@ -178,6 +178,32 @@ pub enum StoreValueKind {
     Timestamp = 9,
 }
 
+// ============================================================================
+// FromAscPtr Trait — Deserialize types from AssemblyScript memory
+// ============================================================================
+
+/// Trait for types that can be deserialized from AssemblyScript memory.
+///
+/// This is the core trait that enables automatic deserialization of event
+/// parameters and other data passed from graph-node to handler functions.
+pub trait FromAscPtr: Sized {
+    /// Deserialize from an AssemblyScript pointer.
+    ///
+    /// # Safety
+    /// The pointer must point to valid AS memory with the correct type layout.
+    fn from_asc_ptr(ptr: u32) -> Self;
+}
+
+/// Trait for types that can be serialized to AssemblyScript memory.
+pub trait ToAscPtr {
+    /// Serialize to AssemblyScript memory and return the pointer.
+    fn to_asc_ptr(&self) -> u32;
+}
+
+// ============================================================================
+// String conversion functions
+// ============================================================================
+
 /// Convert a Rust string to an AssemblyScript string in WASM memory.
 ///
 /// AssemblyScript strings are UTF-16LE encoded with a 20-byte header.
@@ -279,4 +305,102 @@ pub fn asc_to_bytes(ptr: AscPtr<AscBytes>) -> Vec<u8> {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn asc_to_bytes(_ptr: AscPtr<AscBytes>) -> Vec<u8> {
     panic!("asc_to_bytes not available on native target");
+}
+
+// ============================================================================
+// FromAscPtr Implementations for Basic Types
+// ============================================================================
+
+#[cfg(target_arch = "wasm32")]
+impl FromAscPtr for alloc::string::String {
+    fn from_asc_ptr(ptr: u32) -> Self {
+        asc_to_string(AscPtr::new(ptr))
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FromAscPtr for alloc::string::String {
+    fn from_asc_ptr(_ptr: u32) -> Self {
+        alloc::string::String::new()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl FromAscPtr for alloc::vec::Vec<u8> {
+    fn from_asc_ptr(ptr: u32) -> Self {
+        asc_to_bytes(AscPtr::new(ptr))
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FromAscPtr for alloc::vec::Vec<u8> {
+    fn from_asc_ptr(_ptr: u32) -> Self {
+        alloc::vec::Vec::new()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl FromAscPtr for bool {
+    fn from_asc_ptr(ptr: u32) -> Self {
+        ptr != 0
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FromAscPtr for bool {
+    fn from_asc_ptr(_ptr: u32) -> Self {
+        false
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl FromAscPtr for i32 {
+    fn from_asc_ptr(ptr: u32) -> Self {
+        ptr as i32
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FromAscPtr for i32 {
+    fn from_asc_ptr(_ptr: u32) -> Self {
+        0
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl FromAscPtr for u32 {
+    fn from_asc_ptr(ptr: u32) -> Self {
+        ptr
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FromAscPtr for u32 {
+    fn from_asc_ptr(_ptr: u32) -> Self {
+        0
+    }
+}
+
+/// Read a u32 from AS memory at the given offset from a base pointer.
+#[cfg(target_arch = "wasm32")]
+#[inline]
+pub unsafe fn read_u32_at(base: u32, offset: usize) -> u32 {
+    let ptr = (base as *const u8).add(offset) as *const u32;
+    core::ptr::read_unaligned(ptr)
+}
+
+/// Read a u64 from AS memory at the given offset from a base pointer.
+#[cfg(target_arch = "wasm32")]
+#[inline]
+pub unsafe fn read_u64_at(base: u32, offset: usize) -> u64 {
+    let ptr = (base as *const u8).add(offset) as *const u64;
+    core::ptr::read_unaligned(ptr)
+}
+
+/// Read an i32 from AS memory at the given offset from a base pointer.
+#[cfg(target_arch = "wasm32")]
+#[inline]
+pub unsafe fn read_i32_at(base: u32, offset: usize) -> i32 {
+    let ptr = (base as *const u8).add(offset) as *const i32;
+    core::ptr::read_unaligned(ptr)
 }

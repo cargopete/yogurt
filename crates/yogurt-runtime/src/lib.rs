@@ -9,7 +9,7 @@
 extern crate alloc;
 
 mod allocator;
-mod asc;
+pub mod asc;
 mod host;
 mod types;
 
@@ -32,6 +32,7 @@ pub use types::*;
 /// use yogurt_runtime::prelude::*;
 /// ```
 pub mod prelude {
+    pub use crate::asc::FromAscPtr;
     pub use crate::ethereum::{Block, Event, Transaction, TransactionReceipt};
     pub use crate::types::{Address, BigDecimal, BigInt, Bytes, Entity, Value};
     pub use crate::{data_source, log};

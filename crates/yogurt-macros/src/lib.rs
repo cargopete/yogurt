@@ -78,7 +78,7 @@ pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
         #fn_vis fn #fn_name(#param_name: #param_type) #fn_block
 
         // WASM export wrapper
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         pub extern "C" fn #wrapper_name(ptr: u32) {
             let #param_name = <#param_type as yogurt_runtime::asc::FromAscPtr>::from_asc_ptr(ptr);
             #fn_name(#param_name);
