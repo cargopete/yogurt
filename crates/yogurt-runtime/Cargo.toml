@@ -1,0 +1,21 @@
+[package]
+name = "yogurt-runtime"
+description = "Runtime library for yogurt - The Graph subgraph mappings in Rust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["wasm"]
+wasm = []
+std = []
+testing = ["std"]
+
+[dependencies]
+yogurt-macros = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# No external deps for wasm32 - we're no_std
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Testing/native dependencies

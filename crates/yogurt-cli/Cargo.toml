@@ -1,0 +1,24 @@
+[package]
+name = "yogurt-cli"
+description = "CLI for yogurt - build Rust subgraphs for The Graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "yogurt"
+path = "src/main.rs"
+
+[dependencies]
+yogurt-codegen = { workspace = true }
+clap = { workspace = true }
+dialoguer = { workspace = true }
+console = { workspace = true }
+indicatif = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+walrus = { workspace = true }
+anyhow = { workspace = true }

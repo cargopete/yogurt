@@ -1,0 +1,64 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/yogurt-cli",
+    "crates/yogurt-runtime",
+    "crates/yogurt-codegen",
+    "crates/yogurt-macros",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/example/yogurt"
+keywords = ["graph", "subgraph", "wasm", "ethereum", "indexing"]
+categories = ["development-tools", "wasm", "web-programming"]
+
+[workspace.dependencies]
+# Internal crates
+yogurt-runtime = { path = "crates/yogurt-runtime" }
+yogurt-codegen = { path = "crates/yogurt-codegen" }
+yogurt-macros = { path = "crates/yogurt-macros" }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+dialoguer = "0.11"
+console = "0.15"
+indicatif = "0.17"
+
+# Codegen & parsing
+syn = { version = "2", features = ["full", "parsing", "printing"] }
+quote = "1"
+proc-macro2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+graphql-parser = "0.4"
+
+# WASM tooling
+walrus = "0.23"
+wasm-encoder = "0.225"
+wasmparser = "0.225"
+
+# Ethereum types
+alloy-json-abi = "0.8"
+alloy-primitives = "0.8"
+
+# Async & networking
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Testing
+pretty_assertions = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"
+codegen-units = 1
