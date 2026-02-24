@@ -22,3 +22,8 @@ tokio = { workspace = true }
 reqwest = { workspace = true }
 walrus = { workspace = true }
 anyhow = { workspace = true }
+wasmparser = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+wasmparser = { workspace = true }
