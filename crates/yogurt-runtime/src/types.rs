@@ -200,6 +200,288 @@ impl PartialEq for BigInt {
 
 impl Eq for BigInt {}
 
+// ============================================================================
+// BigInt Arithmetic Operations
+// ============================================================================
+
+impl BigInt {
+    /// Add two BigInts.
+    #[cfg(target_arch = "wasm32")]
+    pub fn plus(&self, other: &BigInt) -> BigInt {
+        let result = unsafe { crate::host::big_int_plus(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn plus(&self, _other: &BigInt) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Subtract two BigInts.
+    #[cfg(target_arch = "wasm32")]
+    pub fn minus(&self, other: &BigInt) -> BigInt {
+        let result = unsafe { crate::host::big_int_minus(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn minus(&self, _other: &BigInt) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Multiply two BigInts.
+    #[cfg(target_arch = "wasm32")]
+    pub fn times(&self, other: &BigInt) -> BigInt {
+        let result = unsafe { crate::host::big_int_times(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn times(&self, _other: &BigInt) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Divide two BigInts (integer division).
+    #[cfg(target_arch = "wasm32")]
+    pub fn divided_by(&self, other: &BigInt) -> BigInt {
+        let result = unsafe { crate::host::big_int_divided_by(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn divided_by(&self, _other: &BigInt) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Modulo operation.
+    #[cfg(target_arch = "wasm32")]
+    pub fn modulo(&self, other: &BigInt) -> BigInt {
+        let result = unsafe { crate::host::big_int_mod(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn modulo(&self, _other: &BigInt) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Raise to a power.
+    #[cfg(target_arch = "wasm32")]
+    pub fn pow(&self, exp: u8) -> BigInt {
+        let result = unsafe { crate::host::big_int_pow(self.ptr.as_i32(), exp as i32) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn pow(&self, _exp: u8) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Bitwise OR.
+    #[cfg(target_arch = "wasm32")]
+    pub fn bit_or(&self, other: &BigInt) -> BigInt {
+        let result = unsafe { crate::host::big_int_bit_or(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn bit_or(&self, _other: &BigInt) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Bitwise AND.
+    #[cfg(target_arch = "wasm32")]
+    pub fn bit_and(&self, other: &BigInt) -> BigInt {
+        let result = unsafe { crate::host::big_int_bit_and(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn bit_and(&self, _other: &BigInt) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Left shift.
+    #[cfg(target_arch = "wasm32")]
+    pub fn left_shift(&self, bits: u8) -> BigInt {
+        let result = unsafe { crate::host::big_int_left_shift(self.ptr.as_i32(), bits as i32) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn left_shift(&self, _bits: u8) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Right shift.
+    #[cfg(target_arch = "wasm32")]
+    pub fn right_shift(&self, bits: u8) -> BigInt {
+        let result = unsafe { crate::host::big_int_right_shift(self.ptr.as_i32(), bits as i32) };
+        BigInt::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn right_shift(&self, _bits: u8) -> BigInt {
+        BigInt::zero()
+    }
+
+    /// Check if this BigInt is zero.
+    pub fn is_zero(&self) -> bool {
+        *self == BigInt::zero()
+    }
+
+    /// Convert to hex string.
+    #[cfg(target_arch = "wasm32")]
+    pub fn to_hex(&self) -> String {
+        let str_ptr = unsafe { crate::host::big_int_to_hex(self.ptr.as_i32()) };
+        crate::asc::asc_to_string(AscPtr::new(str_ptr as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn to_hex(&self) -> String {
+        String::from("0x0")
+    }
+}
+
+// Rust operator trait implementations for BigInt
+impl core::ops::Add for BigInt {
+    type Output = BigInt;
+    fn add(self, other: BigInt) -> BigInt {
+        self.plus(&other)
+    }
+}
+
+impl core::ops::Add<&BigInt> for BigInt {
+    type Output = BigInt;
+    fn add(self, other: &BigInt) -> BigInt {
+        self.plus(other)
+    }
+}
+
+impl core::ops::Add for &BigInt {
+    type Output = BigInt;
+    fn add(self, other: &BigInt) -> BigInt {
+        self.plus(other)
+    }
+}
+
+impl core::ops::Sub for BigInt {
+    type Output = BigInt;
+    fn sub(self, other: BigInt) -> BigInt {
+        self.minus(&other)
+    }
+}
+
+impl core::ops::Sub<&BigInt> for BigInt {
+    type Output = BigInt;
+    fn sub(self, other: &BigInt) -> BigInt {
+        self.minus(other)
+    }
+}
+
+impl core::ops::Sub for &BigInt {
+    type Output = BigInt;
+    fn sub(self, other: &BigInt) -> BigInt {
+        self.minus(other)
+    }
+}
+
+impl core::ops::Mul for BigInt {
+    type Output = BigInt;
+    fn mul(self, other: BigInt) -> BigInt {
+        self.times(&other)
+    }
+}
+
+impl core::ops::Mul<&BigInt> for BigInt {
+    type Output = BigInt;
+    fn mul(self, other: &BigInt) -> BigInt {
+        self.times(other)
+    }
+}
+
+impl core::ops::Mul for &BigInt {
+    type Output = BigInt;
+    fn mul(self, other: &BigInt) -> BigInt {
+        self.times(other)
+    }
+}
+
+impl core::ops::Div for BigInt {
+    type Output = BigInt;
+    fn div(self, other: BigInt) -> BigInt {
+        self.divided_by(&other)
+    }
+}
+
+impl core::ops::Div<&BigInt> for BigInt {
+    type Output = BigInt;
+    fn div(self, other: &BigInt) -> BigInt {
+        self.divided_by(other)
+    }
+}
+
+impl core::ops::Div for &BigInt {
+    type Output = BigInt;
+    fn div(self, other: &BigInt) -> BigInt {
+        self.divided_by(other)
+    }
+}
+
+impl core::ops::Rem for BigInt {
+    type Output = BigInt;
+    fn rem(self, other: BigInt) -> BigInt {
+        self.modulo(&other)
+    }
+}
+
+impl core::ops::Rem<&BigInt> for BigInt {
+    type Output = BigInt;
+    fn rem(self, other: &BigInt) -> BigInt {
+        self.modulo(other)
+    }
+}
+
+impl core::ops::BitOr for BigInt {
+    type Output = BigInt;
+    fn bitor(self, other: BigInt) -> BigInt {
+        self.bit_or(&other)
+    }
+}
+
+impl core::ops::BitAnd for BigInt {
+    type Output = BigInt;
+    fn bitand(self, other: BigInt) -> BigInt {
+        self.bit_and(&other)
+    }
+}
+
+impl core::ops::Shl<u8> for BigInt {
+    type Output = BigInt;
+    fn shl(self, bits: u8) -> BigInt {
+        self.left_shift(bits)
+    }
+}
+
+impl core::ops::Shr<u8> for BigInt {
+    type Output = BigInt;
+    fn shr(self, bits: u8) -> BigInt {
+        self.right_shift(bits)
+    }
+}
+
+impl From<i32> for BigInt {
+    fn from(value: i32) -> Self {
+        BigInt::from_i32(value)
+    }
+}
+
+impl From<u64> for BigInt {
+    fn from(value: u64) -> Self {
+        BigInt::from_u64(value)
+    }
+}
+
 /// Arbitrary-precision decimal number.
 ///
 /// Backed by graph-node host calls for arithmetic operations.
@@ -272,6 +554,175 @@ impl PartialEq for BigDecimal {
 }
 
 impl Eq for BigDecimal {}
+
+// ============================================================================
+// BigDecimal Arithmetic Operations
+// ============================================================================
+
+impl BigDecimal {
+    /// Add two BigDecimals.
+    #[cfg(target_arch = "wasm32")]
+    pub fn plus(&self, other: &BigDecimal) -> BigDecimal {
+        let result = unsafe { crate::host::big_decimal_plus(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigDecimal::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn plus(&self, _other: &BigDecimal) -> BigDecimal {
+        BigDecimal::zero()
+    }
+
+    /// Subtract two BigDecimals.
+    #[cfg(target_arch = "wasm32")]
+    pub fn minus(&self, other: &BigDecimal) -> BigDecimal {
+        let result = unsafe { crate::host::big_decimal_minus(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigDecimal::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn minus(&self, _other: &BigDecimal) -> BigDecimal {
+        BigDecimal::zero()
+    }
+
+    /// Multiply two BigDecimals.
+    #[cfg(target_arch = "wasm32")]
+    pub fn times(&self, other: &BigDecimal) -> BigDecimal {
+        let result = unsafe { crate::host::big_decimal_times(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigDecimal::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn times(&self, _other: &BigDecimal) -> BigDecimal {
+        BigDecimal::zero()
+    }
+
+    /// Divide two BigDecimals.
+    #[cfg(target_arch = "wasm32")]
+    pub fn divided_by(&self, other: &BigDecimal) -> BigDecimal {
+        let result = unsafe { crate::host::big_decimal_divided_by(self.ptr.as_i32(), other.ptr.as_i32()) };
+        BigDecimal::from_ptr(AscPtr::new(result as u32))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn divided_by(&self, _other: &BigDecimal) -> BigDecimal {
+        BigDecimal::zero()
+    }
+
+    /// Check if this BigDecimal is zero.
+    pub fn is_zero(&self) -> bool {
+        *self == BigDecimal::zero()
+    }
+
+    /// Create a BigDecimal from a BigInt.
+    #[cfg(target_arch = "wasm32")]
+    pub fn from_big_int(value: &BigInt) -> BigDecimal {
+        // Convert BigInt to string, then parse as BigDecimal
+        let s = value.to_string();
+        BigDecimal::from_string(&s)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_big_int(_value: &BigInt) -> BigDecimal {
+        BigDecimal::zero()
+    }
+}
+
+// Rust operator trait implementations for BigDecimal
+impl core::ops::Add for BigDecimal {
+    type Output = BigDecimal;
+    fn add(self, other: BigDecimal) -> BigDecimal {
+        self.plus(&other)
+    }
+}
+
+impl core::ops::Add<&BigDecimal> for BigDecimal {
+    type Output = BigDecimal;
+    fn add(self, other: &BigDecimal) -> BigDecimal {
+        self.plus(other)
+    }
+}
+
+impl core::ops::Add for &BigDecimal {
+    type Output = BigDecimal;
+    fn add(self, other: &BigDecimal) -> BigDecimal {
+        self.plus(other)
+    }
+}
+
+impl core::ops::Sub for BigDecimal {
+    type Output = BigDecimal;
+    fn sub(self, other: BigDecimal) -> BigDecimal {
+        self.minus(&other)
+    }
+}
+
+impl core::ops::Sub<&BigDecimal> for BigDecimal {
+    type Output = BigDecimal;
+    fn sub(self, other: &BigDecimal) -> BigDecimal {
+        self.minus(other)
+    }
+}
+
+impl core::ops::Sub for &BigDecimal {
+    type Output = BigDecimal;
+    fn sub(self, other: &BigDecimal) -> BigDecimal {
+        self.minus(other)
+    }
+}
+
+impl core::ops::Mul for BigDecimal {
+    type Output = BigDecimal;
+    fn mul(self, other: BigDecimal) -> BigDecimal {
+        self.times(&other)
+    }
+}
+
+impl core::ops::Mul<&BigDecimal> for BigDecimal {
+    type Output = BigDecimal;
+    fn mul(self, other: &BigDecimal) -> BigDecimal {
+        self.times(other)
+    }
+}
+
+impl core::ops::Mul for &BigDecimal {
+    type Output = BigDecimal;
+    fn mul(self, other: &BigDecimal) -> BigDecimal {
+        self.times(other)
+    }
+}
+
+impl core::ops::Div for BigDecimal {
+    type Output = BigDecimal;
+    fn div(self, other: BigDecimal) -> BigDecimal {
+        self.divided_by(&other)
+    }
+}
+
+impl core::ops::Div<&BigDecimal> for BigDecimal {
+    type Output = BigDecimal;
+    fn div(self, other: &BigDecimal) -> BigDecimal {
+        self.divided_by(other)
+    }
+}
+
+impl core::ops::Div for &BigDecimal {
+    type Output = BigDecimal;
+    fn div(self, other: &BigDecimal) -> BigDecimal {
+        self.divided_by(other)
+    }
+}
+
+impl From<&str> for BigDecimal {
+    fn from(s: &str) -> Self {
+        BigDecimal::from_string(s)
+    }
+}
+
+impl From<&BigInt> for BigDecimal {
+    fn from(value: &BigInt) -> Self {
+        BigDecimal::from_big_int(value)
+    }
+}
 
 /// A value that can be stored in an entity field.
 #[derive(Clone, Debug)]
