@@ -33,6 +33,11 @@ pub mod class_id {
     pub const TYPED_MAP_ENTRY: u32 = 1002;     // TypedMapEntry<K, V>
     pub const STORE_VALUE: u32 = 1003;         // Enum<StoreValueKind>
     pub const ARRAY_STORE_VALUE: u32 = 1004;   // Array<StoreValue>
+
+    // Ethereum types
+    pub const SMART_CONTRACT_CALL: u32 = 1010; // ethereum.SmartContractCall
+    pub const ETHEREUM_VALUE: u32 = 1011;      // ethereum.Value (enum)
+    pub const ARRAY_ETHEREUM_VALUE: u32 = 1012; // Array<ethereum.Value>
 }
 
 /// Current heap pointer for bump allocation

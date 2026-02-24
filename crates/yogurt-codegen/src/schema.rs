@@ -235,27 +235,105 @@ fn generate_getter(field: &Field) -> String {
             }
         }
         FieldType::Int => {
-            let body = format!("self.data.get(\"{}\").and_then(|v| match v {{ Value::Int(i) => Some(*i), _ => None }}).unwrap_or(0)", name);
-            ("i32".to_string(), body)
+            if field.is_required {
+                (
+                    "i32".to_string(),
+                    format!("self.data.get_int_opt(\"{}\").unwrap_or(0)", name),
+                )
+            } else {
+                (
+                    "Option<i32>".to_string(),
+                    format!("self.data.get_int_opt(\"{}\")", name),
+                )
+            }
         }
         FieldType::Int8 => {
-            let body = format!("self.data.get(\"{}\").and_then(|v| match v {{ Value::Int8(i) => Some(*i), _ => None }}).unwrap_or(0)", name);
-            ("i64".to_string(), body)
+            if field.is_required {
+                (
+                    "i64".to_string(),
+                    format!("self.data.get_int8_opt(\"{}\").unwrap_or(0)", name),
+                )
+            } else {
+                (
+                    "Option<i64>".to_string(),
+                    format!("self.data.get_int8_opt(\"{}\")", name),
+                )
+            }
         }
-        FieldType::BigInt => ("BigInt".to_string(), format!("self.data.get_bigint(\"{}\")", name)),
-        FieldType::BigDecimal => ("BigDecimal".to_string(), format!("self.data.get_big_decimal(\"{}\")", name)),
-        FieldType::Bytes => ("Bytes".to_string(), format!("self.data.get_bytes(\"{}\")", name)),
+        FieldType::BigInt => {
+            if field.is_required {
+                ("BigInt".to_string(), format!("self.data.get_bigint(\"{}\")", name))
+            } else {
+                ("Option<BigInt>".to_string(), format!("self.data.get_bigint_opt(\"{}\")", name))
+            }
+        }
+        FieldType::BigDecimal => {
+            if field.is_required {
+                ("BigDecimal".to_string(), format!("self.data.get_big_decimal(\"{}\")", name))
+            } else {
+                ("Option<BigDecimal>".to_string(), format!("self.data.get_big_decimal_opt(\"{}\")", name))
+            }
+        }
+        FieldType::Bytes => {
+            if field.is_required {
+                ("Bytes".to_string(), format!("self.data.get_bytes(\"{}\")", name))
+            } else {
+                ("Option<Bytes>".to_string(), format!("self.data.get_bytes_opt(\"{}\")", name))
+            }
+        }
         FieldType::Boolean => {
-            let body = format!("self.data.get(\"{}\").and_then(|v| match v {{ Value::Bool(b) => Some(*b), _ => None }}).unwrap_or(false)", name);
-            ("bool".to_string(), body)
+            if field.is_required {
+                (
+                    "bool".to_string(),
+                    format!("self.data.get_bool_opt(\"{}\").unwrap_or(false)", name),
+                )
+            } else {
+                (
+                    "Option<bool>".to_string(),
+                    format!("self.data.get_bool_opt(\"{}\")", name),
+                )
+            }
         }
-        FieldType::Array(_) => {
-            // TODO: Implement array getters
-            ("Vec<Value>".to_string(), "Vec::new()".to_string())
+        FieldType::Array(inner) => {
+            match inner.as_ref() {
+                FieldType::String | FieldType::Id => {
+                    ("Vec<String>".to_string(), format!("self.data.get_string_array(\"{}\")", name))
+                }
+                FieldType::Bytes => {
+                    ("Vec<Bytes>".to_string(), format!("self.data.get_bytes_array(\"{}\")", name))
+                }
+                FieldType::BigInt => {
+                    ("Vec<BigInt>".to_string(), format!("self.data.get_bigint_array(\"{}\")", name))
+                }
+                FieldType::BigDecimal => {
+                    ("Vec<BigDecimal>".to_string(), format!("self.data.get_big_decimal_array(\"{}\")", name))
+                }
+                FieldType::Int => {
+                    ("Vec<i32>".to_string(), format!("self.data.get_int_array(\"{}\")", name))
+                }
+                FieldType::Int8 => {
+                    ("Vec<i64>".to_string(), format!("self.data.get_int_array(\"{}\").into_iter().map(|i| i as i64).collect()", name))
+                }
+                FieldType::Boolean => {
+                    ("Vec<bool>".to_string(), format!("self.data.get_bool_array(\"{}\")", name))
+                }
+                FieldType::Reference(_) => {
+                    // References stored as ID strings
+                    ("Vec<String>".to_string(), format!("self.data.get_string_array(\"{}\")", name))
+                }
+                FieldType::Array(_) => {
+                    // Nested arrays - rare but possible
+                    ("Vec<Value>".to_string(), format!("self.data.get_array(\"{}\").cloned().unwrap_or_default()", name))
+                }
+            }
         }
-        FieldType::Reference(ref_type) => {
+        FieldType::Reference(_) => {
             // References are stored as ID strings
-            ("String".to_string(), format!("self.data.get_string(\"{}\").to_string()", name))
+            if field.is_required {
+                ("String".to_string(), format!("self.data.get_string(\"{}\").to_string()", name))
+            } else {
+                ("Option<String>".to_string(), format!("self.data.get_string_opt(\"{}\").map(|s| s.to_string())", name))
+            }
         }
     };
 
@@ -267,8 +345,10 @@ fn generate_getter(field: &Field) -> String {
 
 fn generate_setter(field: &Field) -> String {
     let name = &field.name;
-    let method_name = format!("set_{}", to_snake_case(name));
+    let snake_name = to_snake_case(name);
+    let method_name = format!("set_{}", snake_name);
 
+    // Generate the basic setter first
     let (param_type, value_expr) = match &field.field_type {
         FieldType::Id | FieldType::String => {
             ("impl Into<String>".to_string(), "Value::String(val.into())")
@@ -279,19 +359,69 @@ fn generate_setter(field: &Field) -> String {
         FieldType::BigDecimal => ("impl Into<BigDecimal>".to_string(), "Value::BigDecimal(val.into())"),
         FieldType::Bytes => ("impl Into<Bytes>".to_string(), "Value::Bytes(val.into())"),
         FieldType::Boolean => ("bool".to_string(), "Value::Bool(val)"),
-        FieldType::Array(_) => {
-            // TODO: Implement array setters
-            return String::new();
+        FieldType::Array(inner) => {
+            let (param_type, map_expr) = match inner.as_ref() {
+                FieldType::String | FieldType::Id => (
+                    "impl IntoIterator<Item = impl Into<String>>",
+                    "val.into_iter().map(|v| Value::String(v.into())).collect()",
+                ),
+                FieldType::Bytes => (
+                    "impl IntoIterator<Item = impl Into<Bytes>>",
+                    "val.into_iter().map(|v| Value::Bytes(v.into())).collect()",
+                ),
+                FieldType::BigInt => (
+                    "impl IntoIterator<Item = impl Into<BigInt>>",
+                    "val.into_iter().map(|v| Value::BigInt(v.into())).collect()",
+                ),
+                FieldType::BigDecimal => (
+                    "impl IntoIterator<Item = impl Into<BigDecimal>>",
+                    "val.into_iter().map(|v| Value::BigDecimal(v.into())).collect()",
+                ),
+                FieldType::Int => (
+                    "impl IntoIterator<Item = i32>",
+                    "val.into_iter().map(Value::Int).collect()",
+                ),
+                FieldType::Int8 => (
+                    "impl IntoIterator<Item = i64>",
+                    "val.into_iter().map(Value::Int8).collect()",
+                ),
+                FieldType::Boolean => (
+                    "impl IntoIterator<Item = bool>",
+                    "val.into_iter().map(Value::Bool).collect()",
+                ),
+                FieldType::Reference(_) => (
+                    "impl IntoIterator<Item = impl Into<String>>",
+                    "val.into_iter().map(|v| Value::String(v.into())).collect()",
+                ),
+                FieldType::Array(_) => {
+                    // Nested arrays are complex, skip for now
+                    return String::new();
+                }
+            };
+            return format!(
+                "    pub fn {}(&mut self, val: {}) {{\n        self.data.set(\"{}\", Value::Array({}));\n    }}\n\n",
+                method_name, param_type, name, map_expr
+            );
         }
         FieldType::Reference(_) => {
             ("impl Into<String>".to_string(), "Value::String(val.into())")
         }
     };
 
-    format!(
+    let mut result = format!(
         "    pub fn {}(&mut self, val: {}) {{\n        self.data.set(\"{}\", {});\n    }}\n\n",
         method_name, param_type, name, value_expr
-    )
+    );
+
+    // For optional fields, also generate an unset method
+    if !field.is_required {
+        result.push_str(&format!(
+            "    pub fn unset_{}(&mut self) {{\n        self.data.set(\"{}\", Value::Null);\n    }}\n\n",
+            snake_name, name
+        ));
+    }
+
+    result
 }
 
 fn to_snake_case(s: &str) -> String {

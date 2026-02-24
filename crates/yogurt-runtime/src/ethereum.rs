@@ -431,14 +431,256 @@ impl<P: FromAscPtr + Default> FromAscPtr for Event<P> {
 ///
 /// Returns `None` if the call reverts.
 #[cfg(target_arch = "wasm32")]
-pub fn call(_call: SmartContractCall) -> Option<Vec<Token>> {
-    // TODO: Implement contract call serialization and host function invocation
-    None
+pub fn call(call_data: SmartContractCall) -> Option<Vec<Token>> {
+    use crate::asc::{str_to_asc, bytes_to_asc, AscArrayHeader};
+    use crate::allocator::{asc_alloc, class_id};
+
+    // SmartContractCall layout in AS memory:
+    // - contractName: AscPtr<String>     (offset 0)
+    // - contractAddress: AscPtr<Bytes>   (offset 4)
+    // - functionName: AscPtr<String>     (offset 8)
+    // - functionSignature: AscPtr<String> (offset 12)
+    // - functionParams: AscPtr<Array<EthereumValue>> (offset 16)
+
+    // Serialize each field
+    let contract_name_ptr = str_to_asc(&call_data.contract_name);
+    let contract_address_ptr = bytes_to_asc(call_data.contract_address.as_bytes());
+    let function_name_ptr = str_to_asc(&call_data.function_name);
+    let function_signature_ptr = str_to_asc(&call_data.function_signature);
+    let params_array_ptr = serialize_token_array(&call_data.function_params);
+
+    // Allocate the SmartContractCall struct (5 * 4 = 20 bytes)
+    let call_ptr = asc_alloc(20, class_id::SMART_CONTRACT_CALL);
+
+    unsafe {
+        let base = call_ptr as *mut u32;
+        core::ptr::write_unaligned(base, contract_name_ptr.as_raw());
+        core::ptr::write_unaligned(base.add(1), contract_address_ptr.as_raw());
+        core::ptr::write_unaligned(base.add(2), function_name_ptr.as_raw());
+        core::ptr::write_unaligned(base.add(3), function_signature_ptr.as_raw());
+        core::ptr::write_unaligned(base.add(4), params_array_ptr);
+    }
+
+    // Call the host function
+    let result_ptr = unsafe { crate::host::ethereum_call(call_ptr as i32) };
+
+    if result_ptr == 0 {
+        return None;
+    }
+
+    // Deserialize the result array
+    Some(deserialize_token_array(result_ptr as u32))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn call(_call: SmartContractCall) -> Option<Vec<Token>> {
     None
+}
+
+/// Serialize an array of Tokens to AS memory.
+#[cfg(target_arch = "wasm32")]
+fn serialize_token_array(tokens: &[Token]) -> u32 {
+    use crate::asc::{str_to_asc, bytes_to_asc, AscArrayHeader};
+    use crate::allocator::{asc_alloc, class_id};
+
+    let count = tokens.len();
+
+    // Allocate buffer for token pointers
+    let buffer_size = (count * 4) as u32;
+    let buffer_ptr = asc_alloc(buffer_size, class_id::ARRAY_BUFFER);
+
+    // Serialize each token
+    for (i, token) in tokens.iter().enumerate() {
+        let token_ptr = serialize_token(token);
+        unsafe {
+            let dest = (buffer_ptr as *mut u32).add(i);
+            core::ptr::write_unaligned(dest, token_ptr);
+        }
+    }
+
+    // Allocate Array struct
+    let array_ptr = asc_alloc(
+        core::mem::size_of::<AscArrayHeader>() as u32,
+        class_id::ARRAY_ETHEREUM_VALUE,
+    );
+
+    unsafe {
+        let header = array_ptr as *mut AscArrayHeader;
+        (*header).buffer = buffer_ptr;
+        (*header).buffer_data_start = 0;
+        (*header).buffer_data_length = buffer_size;
+        (*header).length = count as i32;
+    }
+
+    array_ptr
+}
+
+/// Serialize a single Token to AS memory.
+/// Returns a pointer to an EthereumValue enum.
+#[cfg(target_arch = "wasm32")]
+fn serialize_token(token: &Token) -> u32 {
+    use crate::asc::{str_to_asc, bytes_to_asc, AscEnumHeader};
+    use crate::allocator::{asc_alloc, class_id};
+
+    // EthereumValue enum layout (same as StoreValue):
+    // - kind: i32
+    // - _padding: u32
+    // - payload: u64
+
+    // EthereumValue kinds (from graph-ts):
+    // ADDRESS = 0, FIXED_BYTES = 1, BYTES = 2, INT = 3, UINT = 4,
+    // BOOL = 5, STRING = 6, FIXED_ARRAY = 7, ARRAY = 8, TUPLE = 9
+
+    let (kind, payload): (i32, u64) = match token {
+        Token::Address(addr) => {
+            let ptr = bytes_to_asc(addr.as_bytes());
+            (0, ptr.as_raw() as u64)
+        }
+        Token::FixedBytes(bytes) => {
+            let ptr = bytes_to_asc(bytes);
+            (1, ptr.as_raw() as u64)
+        }
+        Token::Bytes(bytes) => {
+            let ptr = bytes_to_asc(bytes.as_slice());
+            (2, ptr.as_raw() as u64)
+        }
+        Token::Int(bigint) => {
+            (3, bigint.as_ptr().as_raw() as u64)
+        }
+        Token::Uint(bigint) => {
+            (4, bigint.as_ptr().as_raw() as u64)
+        }
+        Token::Bool(b) => {
+            (5, if *b { 1 } else { 0 })
+        }
+        Token::String(s) => {
+            let ptr = str_to_asc(s);
+            (6, ptr.as_raw() as u64)
+        }
+        Token::FixedArray(arr) => {
+            let ptr = serialize_token_array(arr);
+            (7, ptr as u64)
+        }
+        Token::Array(arr) => {
+            let ptr = serialize_token_array(arr);
+            (8, ptr as u64)
+        }
+        Token::Tuple(arr) => {
+            let ptr = serialize_token_array(arr);
+            (9, ptr as u64)
+        }
+    };
+
+    let enum_ptr = asc_alloc(
+        core::mem::size_of::<AscEnumHeader>() as u32,
+        class_id::ETHEREUM_VALUE,
+    );
+
+    unsafe {
+        let header = enum_ptr as *mut AscEnumHeader;
+        (*header).kind = kind;
+        (*header)._padding = 0;
+        (*header).payload = payload;
+    }
+
+    enum_ptr
+}
+
+/// Deserialize an array of Tokens from AS memory.
+#[cfg(target_arch = "wasm32")]
+fn deserialize_token_array(ptr: u32) -> Vec<Token> {
+    use crate::asc::AscArrayHeader;
+
+    if ptr == 0 {
+        return Vec::new();
+    }
+
+    unsafe {
+        let header = ptr as *const AscArrayHeader;
+        let buffer_ptr = (*header).buffer;
+        let length = (*header).length;
+
+        if buffer_ptr == 0 || length <= 0 {
+            return Vec::new();
+        }
+
+        let mut tokens = Vec::with_capacity(length as usize);
+
+        for i in 0..length as usize {
+            let token_ptr_addr = (buffer_ptr as *const u32).add(i);
+            let token_ptr = core::ptr::read_unaligned(token_ptr_addr);
+            tokens.push(deserialize_token(token_ptr));
+        }
+
+        tokens
+    }
+}
+
+/// Deserialize a single Token from AS memory.
+#[cfg(target_arch = "wasm32")]
+fn deserialize_token(ptr: u32) -> Token {
+    use crate::asc::{asc_to_bytes, asc_to_string, AscEnumHeader, AscPtr};
+
+    if ptr == 0 {
+        return Token::Bool(false); // Default fallback
+    }
+
+    unsafe {
+        let header = ptr as *const AscEnumHeader;
+        let kind = (*header).kind;
+        let payload = (*header).payload;
+
+        match kind {
+            0 => {
+                // ADDRESS
+                let bytes = asc_to_bytes(AscPtr::new(payload as u32));
+                Token::Address(Address::from(bytes.as_slice()))
+            }
+            1 => {
+                // FIXED_BYTES
+                let bytes = asc_to_bytes(AscPtr::new(payload as u32));
+                Token::FixedBytes(bytes)
+            }
+            2 => {
+                // BYTES
+                let bytes = asc_to_bytes(AscPtr::new(payload as u32));
+                Token::Bytes(Bytes::from_vec(bytes))
+            }
+            3 => {
+                // INT
+                Token::Int(BigInt::from_ptr(AscPtr::new(payload as u32)))
+            }
+            4 => {
+                // UINT
+                Token::Uint(BigInt::from_ptr(AscPtr::new(payload as u32)))
+            }
+            5 => {
+                // BOOL
+                Token::Bool(payload != 0)
+            }
+            6 => {
+                // STRING
+                let s = asc_to_string(AscPtr::new(payload as u32));
+                Token::String(s)
+            }
+            7 => {
+                // FIXED_ARRAY
+                let arr = deserialize_token_array(payload as u32);
+                Token::FixedArray(arr)
+            }
+            8 => {
+                // ARRAY
+                let arr = deserialize_token_array(payload as u32);
+                Token::Array(arr)
+            }
+            9 => {
+                // TUPLE
+                let arr = deserialize_token_array(payload as u32);
+                Token::Tuple(arr)
+            }
+            _ => Token::Bool(false), // Unknown type
+        }
+    }
 }
 
 /// Encode parameters for a contract call.

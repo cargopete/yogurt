@@ -837,9 +837,140 @@ impl EntityData {
         self.get(key).and_then(|v| v.as_string())
     }
 
+    /// Get an optional bytes field.
+    pub fn get_bytes_opt(&self, key: &str) -> Option<Bytes> {
+        self.get(key).and_then(|v| v.as_bytes()).cloned()
+    }
+
+    /// Get an optional BigInt field.
+    pub fn get_bigint_opt(&self, key: &str) -> Option<BigInt> {
+        self.get(key).and_then(|v| v.as_big_int()).cloned()
+    }
+
+    /// Get an optional BigDecimal field.
+    pub fn get_big_decimal_opt(&self, key: &str) -> Option<BigDecimal> {
+        self.get(key).and_then(|v| v.as_big_decimal()).cloned()
+    }
+
+    /// Get an optional i32 field.
+    pub fn get_int_opt(&self, key: &str) -> Option<i32> {
+        self.get(key).and_then(|v| match v {
+            Value::Int(i) => Some(*i),
+            _ => None,
+        })
+    }
+
+    /// Get an optional i64 field.
+    pub fn get_int8_opt(&self, key: &str) -> Option<i64> {
+        self.get(key).and_then(|v| match v {
+            Value::Int8(i) => Some(*i),
+            _ => None,
+        })
+    }
+
+    /// Get an optional bool field.
+    pub fn get_bool_opt(&self, key: &str) -> Option<bool> {
+        self.get(key).and_then(|v| match v {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        })
+    }
+
     /// Iterate over all fields.
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
         self.fields.iter()
+    }
+
+    /// Get an array field.
+    pub fn get_array(&self, key: &str) -> Option<&Vec<Value>> {
+        match self.get(key) {
+            Some(Value::Array(arr)) => Some(arr),
+            _ => None,
+        }
+    }
+
+    /// Get a string array field.
+    pub fn get_string_array(&self, key: &str) -> Vec<String> {
+        self.get_array(key)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| match v {
+                        Value::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get a bytes array field.
+    pub fn get_bytes_array(&self, key: &str) -> Vec<Bytes> {
+        self.get_array(key)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| match v {
+                        Value::Bytes(b) => Some(b.clone()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get a BigInt array field.
+    pub fn get_bigint_array(&self, key: &str) -> Vec<BigInt> {
+        self.get_array(key)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| match v {
+                        Value::BigInt(bi) => Some(bi.clone()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get a BigDecimal array field.
+    pub fn get_big_decimal_array(&self, key: &str) -> Vec<BigDecimal> {
+        self.get_array(key)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| match v {
+                        Value::BigDecimal(bd) => Some(bd.clone()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get an i32 array field.
+    pub fn get_int_array(&self, key: &str) -> Vec<i32> {
+        self.get_array(key)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| match v {
+                        Value::Int(i) => Some(*i),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get a bool array field.
+    pub fn get_bool_array(&self, key: &str) -> Vec<bool> {
+        self.get_array(key)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| match v {
+                        Value::Bool(b) => Some(*b),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 }
 

@@ -216,12 +216,41 @@ fn generate_contract_binding(name: &str, functions: &[ParsedFunction]) -> String
             format!("&self, {}", params.join(", "))
         };
 
+        // Generate token conversion for each input
+        let token_conversions: Vec<String> = func
+            .inputs
+            .iter()
+            .map(|i| {
+                let var_name = to_snake_case(&i.name);
+                solidity_to_token_conversion(&var_name, &i.solidity_type)
+            })
+            .collect();
+
+        let tokens_array = if token_conversions.is_empty() {
+            "vec![]".to_string()
+        } else {
+            format!("vec![{}]", token_conversions.join(", "))
+        };
+
+        // Generate return value extraction
+        let return_extraction = generate_return_extraction(&func.outputs);
+
         let call_args = func.inputs.iter().map(|i| to_snake_case(&i.name)).collect::<Vec<_>>().join(", ");
         code.push_str(&format!(
             "    /// Call `{func_name}`\n\
             pub fn {method_name}({params_str}) -> Result<{return_type}, String> {{\n\
-                // TODO: Implement contract call\n\
-                Err(\"Contract calls not yet implemented\".into())\n\
+                use yogurt_runtime::ethereum::{{SmartContractCall, Token, call}};\n\
+                \n\
+                let call_data = SmartContractCall {{\n\
+                    contract_name: \"{contract_name}\".into(),\n\
+                    contract_address: self.address.clone(),\n\
+                    function_name: \"{func_name}\".into(),\n\
+                    function_signature: \"{signature}\".into(),\n\
+                    function_params: {tokens_array},\n\
+                }};\n\
+                \n\
+                let result = call(call_data).ok_or_else(|| \"Call reverted\".to_string())?;\n\
+                {return_extraction}\n\
             }}\n\n\
             /// Try to call `{func_name}`, returning None on revert.\n\
             pub fn try_{method_name}({params_str}) -> Option<{return_type}> {{\n\
@@ -231,6 +260,10 @@ fn generate_contract_binding(name: &str, functions: &[ParsedFunction]) -> String
             method_name = method_name,
             params_str = params_str,
             return_type = return_type,
+            contract_name = name,
+            signature = func.signature,
+            tokens_array = tokens_array,
+            return_extraction = return_extraction,
             call_args = call_args
         ));
     }
@@ -307,4 +340,117 @@ fn to_pascal_case(s: &str) -> String {
     }
 
     result
+}
+
+/// Generate code to convert a Rust value to a Token.
+fn solidity_to_token_conversion(var_name: &str, sol_type: &str) -> String {
+    match sol_type {
+        "address" => format!("Token::Address({}.clone())", var_name),
+        "bool" => format!("Token::Bool({})", var_name),
+        "string" => format!("Token::String({}.clone())", var_name),
+        "bytes" => format!("Token::Bytes({}.clone())", var_name),
+        t if t.starts_with("uint") => format!("Token::Uint({}.clone())", var_name),
+        t if t.starts_with("int") => format!("Token::Int({}.clone())", var_name),
+        t if t.starts_with("bytes") && t.len() > 5 => {
+            // Fixed bytes like bytes32
+            format!("Token::FixedBytes({}.as_slice().to_vec())", var_name)
+        }
+        t if t.ends_with("[]") => {
+            let inner = &t[..t.len() - 2];
+            format!(
+                "Token::Array({}.iter().map(|v| {}).collect())",
+                var_name,
+                solidity_to_token_conversion("v", inner).replace("v.clone()", "v.clone()")
+            )
+        }
+        _ => format!("Token::Bytes({}.clone())", var_name), // Fallback
+    }
+}
+
+/// Generate code to extract return values from Token array.
+fn generate_return_extraction(outputs: &[FunctionParam]) -> String {
+    if outputs.is_empty() {
+        return "Ok(())".to_string();
+    }
+
+    if outputs.len() == 1 {
+        let extraction = token_to_rust_extraction("result.get(0)", &outputs[0].solidity_type);
+        return format!(
+            "let value = {};\n\
+            Ok(value)",
+            extraction
+        );
+    }
+
+    // Multiple outputs - return a tuple
+    let extractions: Vec<String> = outputs
+        .iter()
+        .enumerate()
+        .map(|(i, o)| token_to_rust_extraction(&format!("result.get({})", i), &o.solidity_type))
+        .collect();
+
+    format!(
+        "Ok(({}),)",
+        extractions.join(", ")
+    )
+}
+
+/// Generate code to extract a Rust value from a Token.
+fn token_to_rust_extraction(expr: &str, sol_type: &str) -> String {
+    match sol_type {
+        "address" => format!(
+            "match {} {{ Some(Token::Address(a)) => a.clone(), _ => Address::zero() }}",
+            expr
+        ),
+        "bool" => format!(
+            "match {} {{ Some(Token::Bool(b)) => *b, _ => false }}",
+            expr
+        ),
+        "string" => format!(
+            "match {} {{ Some(Token::String(s)) => s.clone(), _ => String::new() }}",
+            expr
+        ),
+        "bytes" => format!(
+            "match {} {{ Some(Token::Bytes(b)) => b.clone(), _ => Bytes::new() }}",
+            expr
+        ),
+        t if t.starts_with("uint") => {
+            let bits: u32 = t[4..].parse().unwrap_or(256);
+            if bits <= 64 {
+                format!(
+                    "match {} {{ Some(Token::Uint(n)) => {{ let s = n.to_string(); s.parse::<u64>().unwrap_or(0) }}, _ => 0 }}",
+                    expr
+                )
+            } else {
+                format!(
+                    "match {} {{ Some(Token::Uint(n)) => n.clone(), _ => BigInt::zero() }}",
+                    expr
+                )
+            }
+        }
+        t if t.starts_with("int") => {
+            let bits: u32 = t[3..].parse().unwrap_or(256);
+            if bits <= 64 {
+                format!(
+                    "match {} {{ Some(Token::Int(n)) => {{ let s = n.to_string(); s.parse::<i64>().unwrap_or(0) }}, _ => 0 }}",
+                    expr
+                )
+            } else {
+                format!(
+                    "match {} {{ Some(Token::Int(n)) => n.clone(), _ => BigInt::zero() }}",
+                    expr
+                )
+            }
+        }
+        t if t.starts_with("bytes") && t.len() > 5 => {
+            format!(
+                "match {} {{ Some(Token::FixedBytes(b)) => Bytes::from(b.as_slice()), _ => Bytes::new() }}",
+                expr
+            )
+        }
+        _ => format!(
+            "match {} {{ Some(Token::Bytes(b)) => b.clone(), _ => Bytes::new() }}",
+            expr
+        ),
+    }
 }
