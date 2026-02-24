@@ -1,0 +1,242 @@
+# yogurt Development Plan
+
+> Rust toolchain for The Graph subgraphs — write mappings in Rust, compile to AS-compatible WASM.
+
+## Project Status
+
+**Current Phase:** Phase 1 — Foundation
+**Started:** 2026-02-24
+**Last Updated:** 2026-02-24
+
+---
+
+## Architecture Overview
+
+```
+yogurt/
+├── crates/
+│   ├── yogurt-cli/          # Binary — the `yogurt` command
+│   ├── yogurt-runtime/      # Library — Rust equivalent of graph-ts
+│   ├── yogurt-codegen/      # Library — schema/ABI → Rust code generator
+│   └── yogurt-macros/       # Proc-macro — #[handler] and other attribute macros
+├── templates/               # Project scaffolding templates
+└── tests/
+    ├── integration/         # End-to-end build + deploy tests
+    └── compat/              # Binary compatibility tests against AS output
+```
+
+---
+
+## Phase 1: Foundation ✅ In Progress
+
+**Goal:** Compile a trivial Rust subgraph handler to WASM that graph-node executes successfully.
+
+### Core Runtime (`yogurt-runtime`)
+
+- [x] Project scaffold and workspace setup
+- [x] Bump allocator with 20-byte AS-compatible headers
+- [x] `AscPtr<T>` type for WASM memory pointers
+- [x] UTF-16LE string encoding (`str_to_asc`, `asc_to_string`)
+- [x] Byte array encoding (`bytes_to_asc`, `asc_to_bytes`)
+- [x] Host function imports (store, ethereum, typeConversion, bigInt, etc.)
+- [x] Core types: `Address`, `Bytes`, `BigInt`, `BigDecimal`, `EntityData`, `Value`
+- [x] `Entity` trait definition
+- [x] Store operations: `store::get`, `store::set`, `store::remove`
+- [x] Ethereum types: `Block`, `Transaction`, `Event<P>`, `Token`
+- [x] Logging: `log::info`, `log::error`, etc.
+- [x] Panic handler and AS runtime exports (`__new`, `__pin`, `__unpin`, `__collect`, `abort`)
+
+### Remaining Phase 1 Tasks
+
+- [ ] **Entity serialization**: Implement `serialize_entity` and `deserialize_entity` for AS memory layout
+- [ ] **BigInt/BigDecimal arithmetic**: Wire up host function calls for `+`, `-`, `*`, `/`, etc.
+- [ ] **Proof of concept**: Create a minimal "hello world" subgraph that:
+  - Handles a `Transfer` event
+  - Creates and saves an entity
+  - Deploys successfully to a local graph-node
+- [ ] **Binary compatibility tests**: Compare yogurt WASM output against equivalent AS output
+
+### Technical Debt / Known Issues
+
+- [ ] Many `TODO` comments in runtime code need implementation
+- [ ] Host function stubs for native target (testing) need proper mock implementations
+- [ ] `#[handler]` macro needs `FromAscPtr` trait implementation
+
+---
+
+## Phase 2: Code Generation
+
+**Goal:** `yogurt codegen` produces type-safe Rust from schema + ABIs.
+
+### Schema Codegen (`yogurt-codegen`)
+
+- [x] GraphQL schema parser (using `graphql-parser`)
+- [x] Entity struct generation with getters/setters
+- [x] `Entity` trait implementation generation
+- [x] `@entity` directive handling
+- [x] `@derivedFrom` directive handling (skip derived fields)
+- [ ] `@entity(immutable: true)` support
+- [ ] Array field types
+- [ ] Nullable field handling improvements
+- [ ] Relation fields (entity references)
+
+### ABI Codegen
+
+- [x] ABI JSON parser (using `alloy-json-abi`)
+- [x] Event struct generation with typed parameters
+- [x] Contract binding generation for view/pure functions
+- [ ] Event deserialization from AS memory layout (`from_asc_ptr`)
+- [ ] Contract call encoding/decoding
+- [ ] Tuple parameter support
+- [ ] Fixed-size array support
+
+### Proc Macros (`yogurt-macros`)
+
+- [x] `#[handler]` attribute macro (basic structure)
+- [ ] `FromAscPtr` trait and implementations
+- [ ] Handler name customization (`#[handler(name = "...")]`)
+- [ ] Multiple handler parameters (for call handlers)
+
+---
+
+## Phase 3: CLI and Developer Experience
+
+**Goal:** Complete `yogurt` CLI with init/codegen/build/deploy workflow.
+
+### CLI Commands (`yogurt-cli`)
+
+- [x] `yogurt init` — interactive project scaffolding
+- [x] `yogurt codegen` — generate Rust from schema/ABIs
+- [x] `yogurt build` — compile to WASM
+- [x] `yogurt test` — run handler tests (stub)
+- [x] `yogurt deploy` — deploy subgraph (stub)
+- [x] `yogurt validate` — check WASM exports
+
+### Build Pipeline
+
+- [x] Cargo build integration for `wasm32-unknown-unknown`
+- [x] `wasm-opt` integration (optional optimisation)
+- [x] WASM export validation
+- [ ] Codegen freshness checking (hash-based)
+- [ ] `__rtti_base` generation for runtime type info
+- [ ] Custom WASM section stripping/modification
+
+### Deployment
+
+- [ ] IPFS upload integration
+- [ ] Subgraph Studio deployment
+- [ ] Self-hosted graph-node deployment
+- [ ] Decentralized network deployment
+
+---
+
+## Phase 4: Testing and Ecosystem
+
+**Goal:** Production-ready testing framework and documentation.
+
+### Testing Framework
+
+- [x] `MockContext` for native testing (basic)
+- [x] Mock block/transaction/receipt helpers
+- [ ] In-memory mock store with proper entity serialization
+- [ ] Mock ethereum.call responses
+- [ ] Event construction helpers
+- [ ] Assertion helpers for entity state
+- [ ] WASM test runner (optional high-fidelity mode)
+
+### Documentation
+
+- [ ] Getting started guide
+- [ ] Migration guide from AssemblyScript
+- [ ] API reference
+- [ ] Example subgraphs:
+  - [ ] ERC-20 token tracker
+  - [ ] ERC-721 NFT indexer
+  - [ ] Uniswap V2 clone
+
+---
+
+## Phase 5: Advanced Features (Ongoing)
+
+- [ ] Data source templates (`dataSource.create`)
+- [ ] File data sources (IPFS-triggered handlers)
+- [ ] Block handlers
+- [ ] Call handlers
+- [ ] `BigInt` and `BigDecimal` with Rust operator overloading (`Add`, `Sub`, etc.)
+- [ ] IPFS integration (`ipfs.cat`, `ipfs.map`)
+- [ ] JSON parsing utilities
+- [ ] `yogurt dev` — file watching with auto-rebuild
+- [ ] `yogurt inspect` — WASM export inspection/debugging
+- [ ] Immutable entity optimizations
+
+---
+
+## Technical Notes
+
+### AssemblyScript Memory Layout
+
+Every AS object has a 20-byte header at negative offsets:
+
+```
+Ptr - 20: mmInfo   (u32) — Memory manager metadata
+Ptr - 16: gcInfo   (u32) — GC tracking (unused)
+Ptr - 12: gcInfo2  (u32) — Additional GC metadata (unused)
+Ptr -  8: rtId     (u32) — Runtime type class ID
+Ptr -  4: rtSize   (u32) — Payload byte length
+Ptr     : [payload bytes...]
+```
+
+Hardcoded type IDs:
+- `Object = 0`
+- `ArrayBuffer = 1`
+- `String = 2`
+
+### Required WASM Exports
+
+| Export | Signature | Purpose |
+|--------|-----------|---------|
+| `memory` | Memory | Linear memory |
+| `__new` | `(size: i32, classId: i32) → i32` | Allocator |
+| `__pin` | `(ptr: i32) → i32` | GC pinning (no-op) |
+| `__unpin` | `(ptr: i32)` | GC unpinning (no-op) |
+| `__collect` | `()` | GC collection (no-op) |
+| `abort` | `(msg, file, line, col: i32)` | Panic handler |
+| Handler functions | `(eventPtr: i32)` | Event handlers |
+
+### String Encoding
+
+All strings are UTF-16LE encoded. Conversion:
+
+```rust
+// Rust &str → AS String
+fn str_to_asc(s: &str) -> AscPtr<AscString> {
+    let utf16: Vec<u16> = s.encode_utf16().collect();
+    // ... allocate and write
+}
+
+// AS String → Rust String
+fn asc_to_string(ptr: AscPtr<AscString>) -> String {
+    // Read rtSize, decode UTF-16LE
+    String::from_utf16_lossy(&units)
+}
+```
+
+---
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-02-24 | Use `graphql-parser` for schema parsing | Mature, well-tested, handles full GraphQL spec |
+| 2026-02-24 | Use `alloy-json-abi` for ABI parsing | Part of alloy-rs ecosystem, actively maintained |
+| 2026-02-24 | Target Rust 2024 edition | Latest stable, better defaults |
+| 2026-02-24 | Bump allocator (no GC) | Handler lifetime is short, memory never freed |
+
+---
+
+## References
+
+- [graph-node runtime/wasm source](https://github.com/graphprotocol/graph-node/tree/master/runtime/wasm)
+- [AssemblyScript memory layout](https://www.assemblyscript.org/runtime.html)
+- [@graphprotocol/graph-ts](https://github.com/graphprotocol/graph-tooling/tree/main/packages/ts)
+- [alloy-rs](https://github.com/alloy-rs/alloy)
