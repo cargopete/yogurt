@@ -4,10 +4,11 @@
 
 ## Project Status
 
-**Current Phase:** Phase 2 — Code Generation
+**Current Phase:** Phase 3 — CLI and Developer Experience
 **Started:** 2026-02-24
 **Last Updated:** 2026-02-24
 **Phase 1 Complete:** PoC compiles to 16KB WASM, passes 21 binary compatibility tests
+**Phase 2 Complete:** Schema arrays, nullable fields, contract call encoding
 
 ---
 
@@ -74,7 +75,7 @@ yogurt/
 
 ---
 
-## Phase 2: Code Generation
+## Phase 2: Code Generation ✅ Complete
 
 **Goal:** `yogurt codegen` produces type-safe Rust from schema + ABIs.
 
@@ -85,10 +86,10 @@ yogurt/
 - [x] `Entity` trait implementation generation
 - [x] `@entity` directive handling
 - [x] `@derivedFrom` directive handling (skip derived fields)
+- [x] Array field types (Vec<T> for all inner types)
+- [x] Nullable field handling (Option<T> for non-required fields, unset_* methods)
+- [x] Relation fields (entity references stored as ID strings)
 - [ ] `@entity(immutable: true)` support
-- [ ] Array field types
-- [ ] Nullable field handling improvements
-- [ ] Relation fields (entity references)
 
 ### ABI Codegen
 
@@ -96,7 +97,8 @@ yogurt/
 - [x] Event struct generation with typed parameters
 - [x] Contract binding generation for view/pure functions
 - [x] Event deserialization from AS memory layout (`FromAscPtr`)
-- [ ] Contract call encoding/decoding
+- [x] Contract call encoding/decoding (Token serialization to AS memory)
+- [x] Return value extraction from Token array
 - [ ] Tuple parameter support
 - [ ] Fixed-size array support
 
