@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-use crate::error::{CodegenError, Result};
+use crate::error::Result;
 
 /// The top-level subgraph manifest.
 #[derive(Debug, Deserialize)]

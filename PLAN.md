@@ -89,7 +89,7 @@ yogurt/
 - [x] Array field types (Vec<T> for all inner types)
 - [x] Nullable field handling (Option<T> for non-required fields, unset_* methods)
 - [x] Relation fields (entity references stored as ID strings)
-- [ ] `@entity(immutable: true)` support
+- [x] `@entity(immutable: true)` support (skips setter generation)
 
 ### ABI Codegen
 
@@ -99,15 +99,15 @@ yogurt/
 - [x] Event deserialization from AS memory layout (`FromAscPtr`)
 - [x] Contract call encoding/decoding (Token serialization to AS memory)
 - [x] Return value extraction from Token array
-- [ ] Tuple parameter support
-- [ ] Fixed-size array support
+- [x] Tuple parameter support (recursive component handling)
+- [x] Fixed-size array support (`[T; N]` Rust arrays)
 
 ### Proc Macros (`yogurt-macros`)
 
 - [x] `#[handler]` attribute macro (basic structure)
 - [x] `FromAscPtr` trait and implementations for all core types
-- [ ] Handler name customization (`#[handler(name = "...")]`)
-- [ ] Multiple handler parameters (for call handlers)
+- [x] Handler name customization (`#[handler(name = "...")]`)
+- [x] Single-parameter design validated (graph-node passes one struct pointer)
 
 ---
 
@@ -129,15 +129,15 @@ yogurt/
 - [x] Cargo build integration for `wasm32-unknown-unknown`
 - [x] `wasm-opt` integration (optional optimisation)
 - [x] WASM export validation
-- [ ] Codegen freshness checking (hash-based)
-- [ ] `__rtti_base` generation for runtime type info
+- [x] Codegen freshness checking (SHA-256 hash of manifest, schema, ABIs)
+- [x] `__rtti_base` export for AssemblyScript compatibility
 - [ ] Custom WASM section stripping/modification
 
 ### Deployment
 
-- [ ] IPFS upload integration
+- [x] IPFS upload integration
 - [ ] Subgraph Studio deployment
-- [ ] Self-hosted graph-node deployment
+- [x] Self-hosted graph-node deployment
 - [ ] Decentralized network deployment
 
 ---

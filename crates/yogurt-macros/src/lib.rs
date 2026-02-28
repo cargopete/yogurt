@@ -5,7 +5,7 @@
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ItemFn, Pat, Type};
+use syn::{parse_macro_input, FnArg, ItemFn, Pat};
 
 /// Transform a mapping handler function into a graph-node-compatible WASM export.
 ///
@@ -48,11 +48,21 @@ pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_block = &input.block;
     let fn_attrs = &input.attrs;
 
-    // Extract the event parameter (should be exactly one)
+    // Extract the event/call parameter (must be exactly one - graph-node passes a single struct pointer)
+    if input.sig.inputs.len() != 1 {
+        return syn::Error::new_spanned(
+            &input.sig,
+            "handler must have exactly one parameter (the event or call struct); \
+             graph-node passes a single pointer to the handler"
+        )
+        .to_compile_error()
+        .into();
+    }
+
     let param = match input.sig.inputs.first() {
         Some(FnArg::Typed(pat_type)) => pat_type,
         _ => {
-            return syn::Error::new_spanned(&input.sig, "handler must have exactly one parameter")
+            return syn::Error::new_spanned(&input.sig, "handler parameter must be typed")
                 .to_compile_error()
                 .into();
         }

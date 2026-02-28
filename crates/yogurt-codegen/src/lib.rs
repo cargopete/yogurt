@@ -13,8 +13,11 @@ pub use error::{CodegenError, Result};
 pub use manifest::{DataSource, Manifest};
 pub use schema::SchemaParser;
 
+use sha2::{Sha256, Digest};
 use std::fs;
 use std::path::Path;
+
+const HASH_FILE_NAME: &str = ".codegen-hash";
 
 /// Generate all Rust code for a subgraph.
 pub fn generate(manifest_path: &Path, output_dir: &Path) -> Result<()> {
@@ -54,6 +57,9 @@ pub fn generate(manifest_path: &Path, output_dir: &Path) -> Result<()> {
     let mod_code = generate_mod_rs(&abi_modules);
     fs::write(output_dir.join("mod.rs"), mod_code)?;
 
+    // Store hash of inputs for freshness checking
+    store_codegen_hash(manifest_path, output_dir)?;
+
     Ok(())
 }
 
@@ -74,4 +80,65 @@ fn generate_mod_rs(abi_modules: &[String]) -> String {
     }
 
     code
+}
+
+/// Compute a hash of all codegen inputs (manifest, schema, ABIs).
+///
+/// This hash is used to determine if codegen needs to be re-run.
+pub fn compute_codegen_hash(manifest_path: &Path) -> Result<String> {
+    let mut hasher = Sha256::new();
+
+    // Hash the manifest itself
+    let manifest_content = fs::read_to_string(manifest_path)?;
+    hasher.update(manifest_content.as_bytes());
+
+    let manifest = Manifest::parse(&manifest_content)?;
+
+    // Hash the schema file
+    if let Some(schema_path) = manifest_path.parent().map(|p| p.join(&manifest.schema.file)) {
+        if schema_path.exists() {
+            hasher.update(fs::read(&schema_path)?);
+        }
+    }
+
+    // Hash all ABI files
+    for data_source in &manifest.data_sources {
+        for abi in &data_source.mapping.abis {
+            if let Some(abi_path) = manifest_path.parent().map(|p| p.join(&abi.file)) {
+                if abi_path.exists() {
+                    hasher.update(fs::read(&abi_path)?);
+                }
+            }
+        }
+    }
+
+    // Include yogurt version to invalidate cache on toolchain updates
+    hasher.update(env!("CARGO_PKG_VERSION").as_bytes());
+
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Check if the generated code is up to date.
+///
+/// Returns `true` if the hash of current inputs matches the stored hash,
+/// meaning codegen can be skipped.
+pub fn is_codegen_fresh(manifest_path: &Path, output_dir: &Path) -> Result<bool> {
+    let hash_file = output_dir.join(HASH_FILE_NAME);
+
+    if !hash_file.exists() {
+        return Ok(false);
+    }
+
+    let stored_hash = fs::read_to_string(&hash_file)?;
+    let current_hash = compute_codegen_hash(manifest_path)?;
+
+    Ok(stored_hash.trim() == current_hash)
+}
+
+/// Store the codegen hash after successful generation.
+fn store_codegen_hash(manifest_path: &Path, output_dir: &Path) -> Result<()> {
+    let hash = compute_codegen_hash(manifest_path)?;
+    let hash_file = output_dir.join(HASH_FILE_NAME);
+    fs::write(hash_file, hash)?;
+    Ok(())
 }

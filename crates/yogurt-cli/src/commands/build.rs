@@ -3,6 +3,7 @@
 use anyhow::Result;
 use console::style;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 pub fn run(release: bool) -> Result<()> {
@@ -10,8 +11,26 @@ pub fn run(release: bool) -> Result<()> {
     println!();
 
     // Check if codegen is up to date
-    println!("  Checking codegen freshness...");
-    // TODO: Check timestamps and hashes
+    let manifest_path = Path::new("subgraph.yaml");
+    let output_dir = Path::new("src/generated");
+
+    if manifest_path.exists() && output_dir.exists() {
+        print!("  Checking codegen freshness... ");
+        match yogurt_codegen::is_codegen_fresh(manifest_path, output_dir) {
+            Ok(true) => {
+                println!("{}", style("up to date").green());
+            }
+            Ok(false) => {
+                println!("{}", style("stale, regenerating").yellow());
+                yogurt_codegen::generate(manifest_path, output_dir)?;
+                println!("  {} Codegen complete", style("✓").green());
+            }
+            Err(e) => {
+                println!("{}", style(format!("error: {}", e)).red());
+                // Continue with build anyway
+            }
+        }
+    }
 
     // Run cargo build
     let profile = if release { "release" } else { "debug" };

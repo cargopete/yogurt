@@ -50,7 +50,7 @@ alloy-primitives = "0.8"
 
 # Async & networking
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "multipart"] }
 
 # Error handling
 thiserror = "2"

@@ -15,3 +15,4 @@ serde_yaml = { workspace = true }
 graphql-parser = { workspace = true }
 alloy-json-abi = { workspace = true }
 thiserror = { workspace = true }
+sha2 = "0.10"

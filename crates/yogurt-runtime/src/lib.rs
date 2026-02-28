@@ -72,4 +72,11 @@ mod wasm {
     pub extern "C" fn __collect() {
         // No-op: we use bump allocation, no GC
     }
+
+    /// Runtime type information base pointer.
+    ///
+    /// AssemblyScript exports this for runtime type reflection.
+    /// We don't use RTTI, so this returns a null pointer.
+    #[unsafe(no_mangle)]
+    pub static __rtti_base: u32 = 0;
 }

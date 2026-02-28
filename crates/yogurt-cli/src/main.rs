@@ -1,6 +1,8 @@
 //! yogurt CLI — Rust toolchain for The Graph subgraphs
 
 mod commands;
+mod graph_node;
+mod ipfs;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -43,14 +45,22 @@ enum Commands {
         wasm: bool,
     },
 
-    /// Deploy the subgraph
+    /// Deploy the subgraph to a local graph-node
     Deploy {
-        /// Deployment target (studio, hosted, or node URL)
-        #[arg(short, long)]
-        target: Option<String>,
-
-        /// Subgraph name
+        /// Subgraph name (format: account/subgraph-name)
         name: Option<String>,
+
+        /// Graph-node admin URL (default: http://localhost:8020)
+        #[arg(long)]
+        node: Option<String>,
+
+        /// IPFS API URL (default: http://localhost:5001)
+        #[arg(long)]
+        ipfs: Option<String>,
+
+        /// Version label for this deployment
+        #[arg(short, long)]
+        version: Option<String>,
     },
 
     /// Validate WASM exports for graph-node compatibility
@@ -70,7 +80,9 @@ async fn main() -> Result<()> {
         Commands::Codegen { manifest } => commands::codegen::run(&manifest),
         Commands::Build { release } => commands::build::run(release),
         Commands::Test { wasm } => commands::test::run(wasm),
-        Commands::Deploy { target, name } => commands::deploy::run(target, name).await,
+        Commands::Deploy { name, node, ipfs, version } => {
+            commands::deploy::run(node, ipfs, name, version).await
+        }
         Commands::Validate { wasm_file } => commands::validate::run(&wasm_file),
     }
 }

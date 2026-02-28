@@ -161,10 +161,19 @@ fn parse_field_type(
 fn generate_entity_struct(entity: &Entity) -> String {
     let name = &entity.name;
 
-    let mut code = format!(
-        "pub struct {} {{\n    data: EntityData,\n}}\n\n",
-        name
-    );
+    // Add doc comment for immutable entities
+    let mut code = if entity.is_immutable {
+        format!(
+            "/// Immutable entity — setters are not generated.\n\
+             pub struct {} {{\n    data: EntityData,\n}}\n\n",
+            name
+        )
+    } else {
+        format!(
+            "pub struct {} {{\n    data: EntityData,\n}}\n\n",
+            name
+        )
+    };
 
     // Constructor
     code.push_str(&format!(
@@ -187,14 +196,16 @@ fn generate_entity_struct(entity: &Entity) -> String {
         code.push_str(&getter);
     }
 
-    // Setters
-    for field in &entity.fields {
-        if field.is_derived || field.name == "id" {
-            continue; // Skip derived fields and id
-        }
+    // Setters (skip for immutable entities)
+    if !entity.is_immutable {
+        for field in &entity.fields {
+            if field.is_derived || field.name == "id" {
+                continue; // Skip derived fields and id
+            }
 
-        let setter = generate_setter(field);
-        code.push_str(&setter);
+            let setter = generate_setter(field);
+            code.push_str(&setter);
+        }
     }
 
     code.push_str("}\n\n");

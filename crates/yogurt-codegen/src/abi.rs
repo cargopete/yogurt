@@ -1,7 +1,7 @@
 //! Ethereum ABI parsing and Rust code generation.
 
-use alloy_json_abi::{Event, Function, JsonAbi};
-use crate::error::{CodegenError, Result};
+use alloy_json_abi::JsonAbi;
+use crate::error::Result;
 
 /// A parsed Ethereum ABI.
 #[derive(Debug)]
@@ -19,11 +19,14 @@ pub struct ParsedEvent {
 }
 
 /// An event input parameter.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EventInput {
     pub name: String,
     pub solidity_type: String,
     pub indexed: bool,
+    /// Tuple components (empty for non-tuple types).
+    /// Stored as FunctionParam for consistency with type resolution.
+    pub components: Vec<FunctionParam>,
 }
 
 /// A parsed function from an ABI.
@@ -37,10 +40,12 @@ pub struct ParsedFunction {
 }
 
 /// A function input/output parameter.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionParam {
     pub name: String,
     pub solidity_type: String,
+    /// Tuple components (empty for non-tuple types).
+    pub components: Vec<FunctionParam>,
 }
 
 impl AbiParser {
@@ -55,11 +60,7 @@ impl AbiParser {
                 inputs: e
                     .inputs
                     .iter()
-                    .map(|i| EventInput {
-                        name: i.name.clone(),
-                        solidity_type: i.ty.to_string(),
-                        indexed: i.indexed,
-                    })
+                    .map(|i| parse_event_input(i))
                     .collect(),
                 signature: e.signature(),
             })
@@ -73,27 +74,14 @@ impl AbiParser {
                 inputs: f
                     .inputs
                     .iter()
-                    .map(|i| FunctionParam {
-                        name: if i.name.is_empty() {
-                            format!("param{}", f.inputs.iter().position(|x| x == i).unwrap_or(0))
-                        } else {
-                            i.name.clone()
-                        },
-                        solidity_type: i.ty.to_string(),
-                    })
+                    .enumerate()
+                    .map(|(idx, i)| parse_function_param(i, idx, "param"))
                     .collect(),
                 outputs: f
                     .outputs
                     .iter()
                     .enumerate()
-                    .map(|(i, o)| FunctionParam {
-                        name: if o.name.is_empty() {
-                            format!("output{}", i)
-                        } else {
-                            o.name.clone()
-                        },
-                        solidity_type: o.ty.to_string(),
-                    })
+                    .map(|(idx, o)| parse_function_param(o, idx, "output"))
                     .collect(),
                 signature: f.signature(),
                 state_mutability: format!("{:?}", f.state_mutability),
@@ -102,7 +90,53 @@ impl AbiParser {
 
         Ok(AbiParser { events, functions })
     }
+}
 
+/// Parse an event input parameter, recursively handling tuple components.
+fn parse_event_input(param: &alloy_json_abi::EventParam) -> EventInput {
+    EventInput {
+        name: param.name.clone(),
+        solidity_type: param.ty.to_string(),
+        indexed: param.indexed,
+        components: parse_param_components(&param.components),
+    }
+}
+
+/// Parse a function parameter, recursively handling tuple components.
+fn parse_function_param(
+    param: &alloy_json_abi::Param,
+    index: usize,
+    prefix: &str,
+) -> FunctionParam {
+    FunctionParam {
+        name: if param.name.is_empty() {
+            format!("{}{}", prefix, index)
+        } else {
+            param.name.clone()
+        },
+        solidity_type: param.ty.to_string(),
+        components: parse_param_components(&param.components),
+    }
+}
+
+/// Recursively parse tuple components from alloy Param.
+fn parse_param_components(components: &[alloy_json_abi::Param]) -> Vec<FunctionParam> {
+    components
+        .iter()
+        .enumerate()
+        .map(|(idx, c)| FunctionParam {
+            name: if c.name.is_empty() {
+                format!("field{}", idx)
+            } else {
+                c.name.clone()
+            },
+            solidity_type: c.ty.to_string(),
+            components: parse_param_components(&c.components),
+        })
+        .collect()
+}
+
+impl AbiParser {
     /// Generate Rust code for this ABI.
     pub fn generate_rust(&self, contract_name: &str) -> String {
         let mut code = String::from(
@@ -138,7 +172,7 @@ fn generate_event_struct(event: &ParsedEvent) -> String {
     // Params struct
     code.push_str(&format!("pub struct {} {{\n", params_struct_name));
     for input in &event.inputs {
-        let rust_type = solidity_to_rust_type(&input.solidity_type);
+        let rust_type = solidity_to_rust_type_with_components(&input.solidity_type, &input.components);
         code.push_str(&format!("    pub {}: {},\n", to_snake_case(&input.name), rust_type));
     }
     code.push_str("}\n\n");
@@ -191,13 +225,13 @@ fn generate_contract_binding(name: &str, functions: &[ParsedFunction]) -> String
         let return_type = if func.outputs.is_empty() {
             "()".to_string()
         } else if func.outputs.len() == 1 {
-            solidity_to_rust_type(&func.outputs[0].solidity_type)
+            solidity_to_rust_type_with_components(&func.outputs[0].solidity_type, &func.outputs[0].components)
         } else {
             format!(
                 "({})",
                 func.outputs
                     .iter()
-                    .map(|o| solidity_to_rust_type(&o.solidity_type))
+                    .map(|o| solidity_to_rust_type_with_components(&o.solidity_type, &o.components))
                     .collect::<Vec<_>>()
                     .join(", ")
             )
@@ -207,7 +241,7 @@ fn generate_contract_binding(name: &str, functions: &[ParsedFunction]) -> String
         let params: Vec<String> = func
             .inputs
             .iter()
-            .map(|i| format!("{}: {}", to_snake_case(&i.name), solidity_to_rust_type(&i.solidity_type)))
+            .map(|i| format!("{}: {}", to_snake_case(&i.name), solidity_to_rust_type_with_components(&i.solidity_type, &i.components)))
             .collect();
 
         let params_str = if params.is_empty() {
@@ -222,7 +256,7 @@ fn generate_contract_binding(name: &str, functions: &[ParsedFunction]) -> String
             .iter()
             .map(|i| {
                 let var_name = to_snake_case(&i.name);
-                solidity_to_token_conversion(&var_name, &i.solidity_type)
+                solidity_to_token_conversion_with_components(&var_name, &i.solidity_type, &i.components)
             })
             .collect();
 
@@ -273,12 +307,17 @@ fn generate_contract_binding(name: &str, functions: &[ParsedFunction]) -> String
 }
 
 fn solidity_to_rust_type(sol_type: &str) -> String {
+    solidity_to_rust_type_with_components(sol_type, &[])
+}
+
+/// Convert a Solidity type to a Rust type, with optional tuple components.
+fn solidity_to_rust_type_with_components(sol_type: &str, components: &[FunctionParam]) -> String {
     match sol_type {
         "address" => "Address".to_string(),
         "bool" => "bool".to_string(),
         "string" => "String".to_string(),
         "bytes" => "Bytes".to_string(),
-        t if t.starts_with("uint") => {
+        t if t.starts_with("uint") && !t.contains('[') => {
             let bits: u32 = t[4..].parse().unwrap_or(256);
             if bits <= 64 {
                 "u64".to_string()
@@ -286,7 +325,7 @@ fn solidity_to_rust_type(sol_type: &str) -> String {
                 "BigInt".to_string()
             }
         }
-        t if t.starts_with("int") => {
+        t if t.starts_with("int") && !t.contains('[') => {
             let bits: u32 = t[3..].parse().unwrap_or(256);
             if bits <= 64 {
                 "i64".to_string()
@@ -294,10 +333,47 @@ fn solidity_to_rust_type(sol_type: &str) -> String {
                 "BigInt".to_string()
             }
         }
-        t if t.starts_with("bytes") => "Bytes".to_string(),
+        t if t.starts_with("bytes") && !t.contains('[') => "Bytes".to_string(),
+        // Tuple type: "tuple" or "tuple[]" or "tuple[N]"
+        "tuple" => {
+            if components.is_empty() {
+                // No components available, fall back to Vec<Token>
+                "Vec<Token>".to_string()
+            } else {
+                // Generate Rust tuple type from components
+                let inner_types: Vec<String> = components
+                    .iter()
+                    .map(|c| solidity_to_rust_type_with_components(&c.solidity_type, &c.components))
+                    .collect();
+                format!("({})", inner_types.join(", "))
+            }
+        }
+        // Fixed-size array: "type[N]" (must come before dynamic array check)
+        t if t.contains('[') && !t.ends_with("[]") => {
+            if let Some(bracket_pos) = t.rfind('[') {
+                let inner = &t[..bracket_pos];
+                let size_str = &t[bracket_pos + 1..t.len() - 1];
+                if let Ok(size) = size_str.parse::<usize>() {
+                    let inner_type = if inner == "tuple" {
+                        solidity_to_rust_type_with_components(inner, components)
+                    } else {
+                        solidity_to_rust_type(inner)
+                    };
+                    return format!("[{}; {}]", inner_type, size);
+                }
+            }
+            // Fallback if parsing fails
+            "Bytes".to_string()
+        }
+        // Dynamic array: "type[]"
         t if t.ends_with("[]") => {
             let inner = &t[..t.len() - 2];
-            format!("Vec<{}>", solidity_to_rust_type(inner))
+            let inner_type = if inner == "tuple" {
+                solidity_to_rust_type_with_components(inner, components)
+            } else {
+                solidity_to_rust_type(inner)
+            };
+            format!("Vec<{}>", inner_type)
         }
         _ => "Bytes".to_string(), // Fallback for unknown types
     }
@@ -342,25 +418,61 @@ fn to_pascal_case(s: &str) -> String {
     result
 }
 
-/// Generate code to convert a Rust value to a Token.
-fn solidity_to_token_conversion(var_name: &str, sol_type: &str) -> String {
+/// Generate code to convert a Rust value to a Token, with tuple component support.
+fn solidity_to_token_conversion_with_components(
+    var_name: &str,
+    sol_type: &str,
+    components: &[FunctionParam],
+) -> String {
     match sol_type {
         "address" => format!("Token::Address({}.clone())", var_name),
         "bool" => format!("Token::Bool({})", var_name),
         "string" => format!("Token::String({}.clone())", var_name),
         "bytes" => format!("Token::Bytes({}.clone())", var_name),
-        t if t.starts_with("uint") => format!("Token::Uint({}.clone())", var_name),
-        t if t.starts_with("int") => format!("Token::Int({}.clone())", var_name),
-        t if t.starts_with("bytes") && t.len() > 5 => {
+        t if t.starts_with("uint") && !t.contains('[') => format!("Token::Uint({}.clone())", var_name),
+        t if t.starts_with("int") && !t.contains('[') => format!("Token::Int({}.clone())", var_name),
+        t if t.starts_with("bytes") && !t.contains('[') && t.len() > 5 => {
             // Fixed bytes like bytes32
             format!("Token::FixedBytes({}.as_slice().to_vec())", var_name)
         }
+        // Tuple type
+        "tuple" => {
+            if components.is_empty() {
+                // No component info, treat as raw token vec
+                format!("Token::Tuple({}.clone())", var_name)
+            } else {
+                // Convert each tuple field
+                let conversions: Vec<String> = components
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| {
+                        let field_access = format!("{}.{}", var_name, i);
+                        solidity_to_token_conversion_with_components(&field_access, &c.solidity_type, &c.components)
+                    })
+                    .collect();
+                format!("Token::Tuple(vec![{}])", conversions.join(", "))
+            }
+        }
+        // Fixed-size array: "type[N]" (must come before dynamic array)
+        t if t.contains('[') && !t.ends_with("[]") => {
+            if let Some(bracket_pos) = t.rfind('[') {
+                let inner = &t[..bracket_pos];
+                format!(
+                    "Token::FixedArray({}.iter().map(|v| {}).collect())",
+                    var_name,
+                    solidity_to_token_conversion_with_components("(*v)", inner, components)
+                )
+            } else {
+                format!("Token::FixedArray({}.to_vec())", var_name)
+            }
+        }
+        // Dynamic array: "type[]"
         t if t.ends_with("[]") => {
             let inner = &t[..t.len() - 2];
             format!(
                 "Token::Array({}.iter().map(|v| {}).collect())",
                 var_name,
-                solidity_to_token_conversion("v", inner).replace("v.clone()", "v.clone()")
+                solidity_to_token_conversion_with_components("v", inner, components)
             )
         }
         _ => format!("Token::Bytes({}.clone())", var_name), // Fallback
@@ -374,7 +486,11 @@ fn generate_return_extraction(outputs: &[FunctionParam]) -> String {
     }
 
     if outputs.len() == 1 {
-        let extraction = token_to_rust_extraction("result.get(0)", &outputs[0].solidity_type);
+        let extraction = token_to_rust_extraction_with_components(
+            "result.get(0)",
+            &outputs[0].solidity_type,
+            &outputs[0].components,
+        );
         return format!(
             "let value = {};\n\
             Ok(value)",
@@ -386,7 +502,13 @@ fn generate_return_extraction(outputs: &[FunctionParam]) -> String {
     let extractions: Vec<String> = outputs
         .iter()
         .enumerate()
-        .map(|(i, o)| token_to_rust_extraction(&format!("result.get({})", i), &o.solidity_type))
+        .map(|(i, o)| {
+            token_to_rust_extraction_with_components(
+                &format!("result.get({})", i),
+                &o.solidity_type,
+                &o.components,
+            )
+        })
         .collect();
 
     format!(
@@ -396,7 +518,11 @@ fn generate_return_extraction(outputs: &[FunctionParam]) -> String {
 }
 
 /// Generate code to extract a Rust value from a Token.
-fn token_to_rust_extraction(expr: &str, sol_type: &str) -> String {
+fn token_to_rust_extraction_with_components(
+    expr: &str,
+    sol_type: &str,
+    components: &[FunctionParam],
+) -> String {
     match sol_type {
         "address" => format!(
             "match {} {{ Some(Token::Address(a)) => a.clone(), _ => Address::zero() }}",
@@ -414,7 +540,7 @@ fn token_to_rust_extraction(expr: &str, sol_type: &str) -> String {
             "match {} {{ Some(Token::Bytes(b)) => b.clone(), _ => Bytes::new() }}",
             expr
         ),
-        t if t.starts_with("uint") => {
+        t if t.starts_with("uint") && !t.contains('[') => {
             let bits: u32 = t[4..].parse().unwrap_or(256);
             if bits <= 64 {
                 format!(
@@ -428,7 +554,7 @@ fn token_to_rust_extraction(expr: &str, sol_type: &str) -> String {
                 )
             }
         }
-        t if t.starts_with("int") => {
+        t if t.starts_with("int") && !t.contains('[') => {
             let bits: u32 = t[3..].parse().unwrap_or(256);
             if bits <= 64 {
                 format!(
@@ -442,10 +568,80 @@ fn token_to_rust_extraction(expr: &str, sol_type: &str) -> String {
                 )
             }
         }
-        t if t.starts_with("bytes") && t.len() > 5 => {
+        t if t.starts_with("bytes") && !t.contains('[') && t.len() > 5 => {
             format!(
                 "match {} {{ Some(Token::FixedBytes(b)) => Bytes::from(b.as_slice()), _ => Bytes::new() }}",
                 expr
+            )
+        }
+        // Tuple type
+        "tuple" => {
+            if components.is_empty() {
+                // No component info, return raw token vec
+                format!(
+                    "match {} {{ Some(Token::Tuple(t)) => t.clone(), _ => Vec::new() }}",
+                    expr
+                )
+            } else {
+                // Extract each tuple field
+                let field_extractions: Vec<String> = components
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| {
+                        token_to_rust_extraction_with_components(
+                            &format!("tuple_tokens.get({})", i),
+                            &c.solidity_type,
+                            &c.components,
+                        )
+                    })
+                    .collect();
+                format!(
+                    "match {} {{ Some(Token::Tuple(tuple_tokens)) => ({},), _ => Default::default() }}",
+                    expr,
+                    field_extractions.join(", ")
+                )
+            }
+        }
+        // Fixed-size array: "type[N]"
+        t if t.contains('[') && !t.ends_with("[]") => {
+            if let Some(bracket_pos) = t.rfind('[') {
+                let inner = &t[..bracket_pos];
+                let size_str = &t[bracket_pos + 1..t.len() - 1];
+                if let Ok(size) = size_str.parse::<usize>() {
+                    let inner_extraction = token_to_rust_extraction_with_components(
+                        "Some(token)",
+                        inner,
+                        components,
+                    );
+                    return format!(
+                        "match {} {{ Some(Token::FixedArray(arr)) => {{ \
+                            let mut result: [_; {}] = Default::default(); \
+                            for (i, token) in arr.iter().enumerate().take({}) {{ \
+                                result[i] = {}; \
+                            }} \
+                            result \
+                        }}, _ => Default::default() }}",
+                        expr, size, size, inner_extraction
+                    );
+                }
+            }
+            // Fallback
+            format!(
+                "match {} {{ Some(Token::FixedArray(arr)) => arr.clone(), _ => Vec::new() }}",
+                expr
+            )
+        }
+        // Dynamic array: "type[]"
+        t if t.ends_with("[]") => {
+            let inner = &t[..t.len() - 2];
+            let inner_extraction = token_to_rust_extraction_with_components(
+                "Some(token)",
+                inner,
+                components,
+            );
+            format!(
+                "match {} {{ Some(Token::Array(arr)) => arr.iter().map(|token| {}).collect(), _ => Vec::new() }}",
+                expr, inner_extraction
             )
         }
         _ => format!(
