@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+  ipfs:
+    image: ipfs/kubo:latest
+    ports:
+      - '5001:5001'  # API
+      - '8080:8080'  # Gateway
+    volumes:
+      - ipfs_data:/data/ipfs
+    healthcheck:
+      test: ['CMD', 'ipfs', 'id']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: graph-node
+      POSTGRES_PASSWORD: let-me-in
+      POSTGRES_DB: graph-node
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U graph-node']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  graph-node:
+    image: graphprotocol/graph-node:latest
+    ports:
+      - '8000:8000'  # GraphQL HTTP
+      - '8001:8001'  # GraphQL WS
+      - '8020:8020'  # Admin JSON-RPC
+      - '8030:8030'  # Index node
+      - '8040:8040'  # Metrics
+    depends_on:
+      ipfs:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      postgres_host: postgres
+      postgres_port: 5432
+      postgres_user: graph-node
+      postgres_pass: let-me-in
+      postgres_db: graph-node
+      ipfs: 'ipfs:5001'
+      # Ethereum RPC - mainnet for the ERC20 test
+      # Set ETHEREUM_RPC env var or replace with your RPC URL
+      ethereum: 'mainnet:${ETHEREUM_RPC:-https://eth.llamarpc.com}'
+      GRAPH_LOG: info
+      GRAPH_ALLOW_NON_DETERMINISTIC_IPFS: 'true'
+    healthcheck:
+      test: ['CMD', 'curl', '-sf', 'http://localhost:8020']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  ipfs_data:
+  postgres_data:
