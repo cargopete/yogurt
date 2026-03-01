@@ -113,6 +113,7 @@ fn generate_templates(templates: &[manifest::DataSourceTemplate]) -> String {
     let mut code = String::from(
         "//! Auto-generated data source templates — do not edit\n\n\
          use alloc::string::ToString;\n\
+         use yogurt_runtime::prelude::Address;\n\
          use yogurt_runtime::data_source;\n\n",
     );
 
@@ -147,8 +148,8 @@ fn generate_templates(templates: &[manifest::DataSourceTemplate]) -> String {
             // Ethereum contract templates take an address
             code.push_str(&format!(
                 "    /// Create a new data source instance for the given contract address.\n\
-                 pub fn create(address: &str) {{\n\
-                     data_source::create(\"{name}\", &[address.to_string()]);\n\
+                 pub fn create(address: &Address) {{\n\
+                     data_source::create(\"{name}\", &[address.to_hex()]);\n\
                  }}\n",
                 name = template.name,
             ));

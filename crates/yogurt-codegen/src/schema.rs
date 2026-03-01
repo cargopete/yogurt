@@ -116,6 +116,8 @@ impl SchemaParser {
              #[allow(unused_imports)]\n\
              use alloc::string::String;\n\
              #[allow(unused_imports)]\n\
+             use alloc::string::ToString;\n\
+             #[allow(unused_imports)]\n\
              use alloc::vec::Vec;\n\
              use yogurt_runtime::prelude::*;\n\
              use yogurt_runtime::store;\n\
@@ -168,7 +170,7 @@ fn generate_entity_struct(entity: &Entity) -> String {
     // Add doc comment for immutable entities
     let mut code = if entity.is_immutable {
         format!(
-            "/// Immutable entity — setters are not generated.\n\
+            "/// Immutable entity — cannot be updated after first save (enforced by graph-node).\n\
              pub struct {} {{\n    data: EntityData,\n}}\n\n",
             name
         )
@@ -200,16 +202,14 @@ fn generate_entity_struct(entity: &Entity) -> String {
         code.push_str(&getter);
     }
 
-    // Setters (skip for immutable entities)
-    if !entity.is_immutable {
-        for field in &entity.fields {
-            if field.is_derived || field.name == "id" {
-                continue; // Skip derived fields and id
-            }
-
-            let setter = generate_setter(field);
-            code.push_str(&setter);
+    // Setters (generated for all entities - immutability is enforced by graph-node on update)
+    for field in &entity.fields {
+        if field.is_derived || field.name == "id" {
+            continue; // Skip derived fields and id
         }
+
+        let setter = generate_setter(field);
+        code.push_str(&setter);
     }
 
     code.push_str("}\n\n");
@@ -441,11 +441,21 @@ fn generate_setter(field: &Field) -> String {
 
 fn to_snake_case(s: &str) -> String {
     let mut result = String::with_capacity(s.len() + 4);
+    let chars: Vec<char> = s.chars().collect();
 
-    for (i, c) in s.chars().enumerate() {
+    for (i, &c) in chars.iter().enumerate() {
         if c.is_uppercase() {
+            // Add underscore before uppercase letter if:
+            // - Not at start
+            // - Previous char is lowercase or digit, OR
+            // - Previous char is uppercase but next char is lowercase (end of acronym)
             if i > 0 {
-                result.push('_');
+                let prev = chars[i - 1];
+                let prev_is_lower_or_digit = prev.is_lowercase() || prev.is_ascii_digit();
+                let next_is_lower = chars.get(i + 1).is_some_and(|c| c.is_lowercase());
+                if prev_is_lower_or_digit || (prev.is_uppercase() && next_is_lower) {
+                    result.push('_');
+                }
             }
             result.push(c.to_ascii_lowercase());
         } else {

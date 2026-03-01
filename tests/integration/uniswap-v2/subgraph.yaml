@@ -1,0 +1,61 @@
+specVersion: 0.0.4
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Factory
+    network: mainnet
+    source:
+      address: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
+      abi: UniswapV2Factory
+      startBlock: 10000835
+    mapping:
+      kind: wasm
+      apiVersion: 0.0.7
+      language: rust/yogurt
+      entities:
+        - Factory
+        - Pair
+        - Token
+      abis:
+        - name: UniswapV2Factory
+          file: ./abis/UniswapV2Factory.json
+        - name: UniswapV2Pair
+          file: ./abis/UniswapV2Pair.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: PairCreated(indexed address,indexed address,address,uint256)
+          handler: handlePairCreated
+      file: ./build/uniswap_v2.wasm
+templates:
+  - kind: ethereum
+    name: Pair
+    network: mainnet
+    source:
+      abi: UniswapV2Pair
+    mapping:
+      kind: wasm
+      apiVersion: 0.0.7
+      language: rust/yogurt
+      entities:
+        - Pair
+        - Swap
+        - Mint
+        - Burn
+        - Token
+      abis:
+        - name: UniswapV2Pair
+          file: ./abis/UniswapV2Pair.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: Swap(indexed address,uint256,uint256,uint256,uint256,indexed address)
+          handler: handleSwap
+        - event: Mint(indexed address,uint256,uint256)
+          handler: handleMint
+        - event: Burn(indexed address,uint256,uint256,indexed address)
+          handler: handleBurn
+        - event: Sync(uint112,uint112)
+          handler: handleSync
+      file: ./build/uniswap_v2.wasm

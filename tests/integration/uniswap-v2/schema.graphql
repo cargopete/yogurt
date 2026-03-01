@@ -1,0 +1,69 @@
+# Uniswap V2 Subgraph Schema
+# Simplified version for yogurt demonstration
+
+type Factory @entity {
+  id: ID!
+  pairCount: BigInt!
+  totalVolumeETH: BigDecimal!
+  totalLiquidityETH: BigDecimal!
+}
+
+type Token @entity {
+  id: ID!
+  symbol: String!
+  name: String!
+  decimals: BigInt!
+  totalSupply: BigInt!
+  tradeVolume: BigDecimal!
+  txCount: BigInt!
+}
+
+type Pair @entity {
+  id: ID!
+  token0: Token!
+  token1: Token!
+  reserve0: BigDecimal!
+  reserve1: BigDecimal!
+  totalSupply: BigDecimal!
+  txCount: BigInt!
+  createdAtTimestamp: BigInt!
+  createdAtBlockNumber: BigInt!
+}
+
+type Swap @entity(immutable: true) {
+  id: ID!
+  pair: Pair!
+  timestamp: BigInt!
+  sender: Bytes!
+  amount0In: BigDecimal!
+  amount1In: BigDecimal!
+  amount0Out: BigDecimal!
+  amount1Out: BigDecimal!
+  to: Bytes!
+  logIndex: BigInt!
+  transaction: Bytes!
+}
+
+type Mint @entity(immutable: true) {
+  id: ID!
+  pair: Pair!
+  timestamp: BigInt!
+  sender: Bytes!
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  to: Bytes!
+  logIndex: BigInt!
+  transaction: Bytes!
+}
+
+type Burn @entity(immutable: true) {
+  id: ID!
+  pair: Pair!
+  timestamp: BigInt!
+  sender: Bytes!
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  to: Bytes!
+  logIndex: BigInt!
+  transaction: Bytes!
+}

@@ -8,6 +8,7 @@ members = [
 ]
 exclude = [
     "tests/integration/erc20-transfer",
+    "tests/integration/uniswap-v2",
 ]
 
 [workspace.package]
