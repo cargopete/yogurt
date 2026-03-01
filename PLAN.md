@@ -171,8 +171,8 @@ yogurt/
 
 ## Phase 5: Advanced Features (Ongoing)
 
-- [ ] Data source templates (`dataSource.create`)
-- [ ] File data sources (IPFS-triggered handlers)
+- [x] Data source templates (`dataSource.create`)
+- [x] File data sources (IPFS-triggered handlers)
 - [x] Block handlers
 - [x] Call handlers
 - [x] `BigInt` and `BigDecimal` with Rust operator overloading (`Add`, `Sub`, etc.)
@@ -250,8 +250,8 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 ## Roadmap / Next Steps
 
 **Top Priority — Feature Parity with AssemblyScript:**
-1. **IPFS integration** — `ipfs.cat`, `ipfs.map` for file data sources
-2. **Data source templates** — `dataSource.create()` for factory patterns
+1. ~~**IPFS integration**~~ ✅ — `ipfs.cat` implemented, file data sources supported
+2. ~~**Data source templates**~~ ✅ — `dataSource.create()` for factory patterns
 
 **Next:**
 3. **Real-world example subgraph** — Uniswap V2 style with multiple entities, contract calls, derived fields to stress-test codegen
@@ -263,6 +263,7 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 - File watching — `yogurt dev` with auto-rebuild
 
 **Recently Completed:**
+- ✅ File data sources and data source templates
 - ✅ Block handlers
 - ✅ Call handlers
 
