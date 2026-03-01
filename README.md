@@ -14,11 +14,14 @@ Write your subgraph mapping handlers in Rust instead of AssemblyScript. yogurt c
 - `yogurt build` — compile to WASM with optional wasm-opt
 - `yogurt validate` — check WASM binary compatibility
 - `yogurt deploy` — deploy to local graph-node
+- Event handlers, block handlers, call handlers
+- Data source templates (`dataSource.create()`)
+- File data sources (IPFS/Arweave)
+- Contract calls (`ethereum.call`)
 
 **Coming soon:**
 - Subgraph Studio deployment
-- Decentralized network deployment
-- Testing framework
+- Testing framework improvements
 
 ## Installation
 
@@ -148,10 +151,16 @@ The complexity lives in the toolchain, not your code. You write idiomatic Rust; 
 
 **ABI (JSON → Rust):**
 - Event structs with typed parameters
+- Call handler structs with typed inputs/outputs
 - Contract bindings for view/pure functions
 - Tuple parameter support
 - Fixed-size array support (`[T; N]`)
 - Automatic `FromAscPtr` implementation
+
+**Templates:**
+- Data source template generation
+- File data source support (`file/ipfs`, `file/arweave`)
+- `Template::create()` methods for spawning new data sources
 
 ## Licence
 

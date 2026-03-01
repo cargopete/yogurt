@@ -176,7 +176,7 @@ yogurt/
 - [x] Block handlers
 - [x] Call handlers
 - [x] `BigInt` and `BigDecimal` with Rust operator overloading (`Add`, `Sub`, etc.)
-- [ ] IPFS integration (`ipfs.cat`, `ipfs.map`)
+- [x] IPFS integration (`ipfs.cat` implemented)
 - [ ] JSON parsing utilities
 - [ ] `yogurt dev` — file watching with auto-rebuild
 - [ ] `yogurt inspect` — WASM export inspection/debugging
