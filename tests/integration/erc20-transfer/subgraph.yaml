@@ -22,4 +22,7 @@ dataSources:
       eventHandlers:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
+      callHandlers:
+        - function: transfer(address,uint256)
+          handler: handleTransferCall
       file: ./build/erc20_transfer.wasm

@@ -173,8 +173,8 @@ yogurt/
 
 - [ ] Data source templates (`dataSource.create`)
 - [ ] File data sources (IPFS-triggered handlers)
-- [ ] Block handlers
-- [ ] Call handlers
+- [x] Block handlers
+- [x] Call handlers
 - [x] `BigInt` and `BigDecimal` with Rust operator overloading (`Add`, `Sub`, etc.)
 - [ ] IPFS integration (`ipfs.cat`, `ipfs.map`)
 - [ ] JSON parsing utilities
@@ -249,19 +249,22 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 
 ## Roadmap / Next Steps
 
-**High Priority:**
-1. **Real-world example subgraph** — Uniswap V2 style with multiple entities, contract calls, derived fields to stress-test codegen
-2. **Subgraph Studio deployment** — API key auth and Studio deployment API
-3. **Data source templates** — `dataSource.create()` for factory patterns
+**Top Priority — Feature Parity with AssemblyScript:**
+1. **IPFS integration** — `ipfs.cat`, `ipfs.map` for file data sources
+2. **Data source templates** — `dataSource.create()` for factory patterns
 
-**Medium Priority:**
-4. **Testing framework** — Mock store, mock `ethereum.call`, event construction helpers
-5. **Block & call handlers** — `blockHandlers` and `callHandlers` in subgraph.yaml
+**Next:**
+3. **Real-world example subgraph** — Uniswap V2 style with multiple entities, contract calls, derived fields to stress-test codegen
+4. **Documentation site** — Getting started, migration guide, API reference
 
-**Lower Priority:**
-6. **File watching** — `yogurt dev` with auto-rebuild
-7. **IPFS integration** — `ipfs.cat`, `ipfs.map`
-8. **Documentation site** — Getting started, migration guide, API reference
+**Future Work:**
+- Subgraph Studio deployment — API key auth and Studio deployment API
+- Testing framework — Enhanced mock store, mock `ethereum.call`, event construction helpers
+- File watching — `yogurt dev` with auto-rebuild
+
+**Recently Completed:**
+- ✅ Block handlers
+- ✅ Call handlers
 
 ---
 

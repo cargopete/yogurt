@@ -4,7 +4,7 @@ use alloc::string::ToString;
 use yogurt_runtime::prelude::*;
 use yogurt_macros::handler;
 
-use crate::generated::{Transfer, TransferEvent};
+use crate::generated::{Transfer, TransferCall, TransferEvent};
 
 /// Handle a Transfer event from an ERC-20 contract.
 ///
@@ -30,6 +30,35 @@ pub fn handle_transfer(event: TransferEvent) {
     transfer.set_block_number(event.block.number);
     transfer.set_block_timestamp(event.block.timestamp);
     transfer.set_transaction_hash(event.transaction.hash);
+
+    // Save to the store
+    transfer.save();
+}
+
+/// Handle a transfer() function call.
+///
+/// This demonstrates call handlers - triggered when the function is called,
+/// not when an event is emitted.
+#[handler]
+pub fn handle_transfer_call(call: TransferCall) {
+    // Create unique ID from transaction hash
+    let id = alloc::format!(
+        "call-{}",
+        call.transaction.hash.to_hex()
+    );
+
+    // Create and populate the Transfer entity
+    let mut transfer = Transfer::new(id);
+
+    // Set transfer details from call inputs
+    transfer.set_from(Bytes::from(call.from.as_bytes())); // caller
+    transfer.set_to(Bytes::from(call.inputs.to.as_bytes()));
+    transfer.set_value(call.inputs.value);
+
+    // Set block context
+    transfer.set_block_number(call.block.number);
+    transfer.set_block_timestamp(call.block.timestamp);
+    transfer.set_transaction_hash(call.transaction.hash);
 
     // Save to the store
     transfer.save();

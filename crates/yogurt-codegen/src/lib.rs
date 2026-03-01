@@ -41,12 +41,27 @@ pub fn generate(manifest_path: &Path, output_dir: &Path) -> Result<()> {
     let mut abi_modules = Vec::new();
 
     for data_source in &manifest.data_sources {
+        // Collect call handler function names for this data source
+        let call_handler_functions: Vec<String> = data_source
+            .mapping
+            .call_handlers
+            .iter()
+            .map(|ch| extract_function_name(&ch.function))
+            .collect();
+
         for abi in &data_source.mapping.abis {
             if let Some(abi_path) = manifest_path.parent().map(|p| p.join(&abi.file)) {
                 let abi_content = fs::read_to_string(&abi_path)?;
                 let parsed_abi = AbiParser::parse(&abi_content)?;
                 let module_name = abi.name.to_lowercase();
-                let abi_code = parsed_abi.generate_rust(&abi.name);
+
+                // Convert to &str slice for the API
+                let func_refs: Vec<&str> = call_handler_functions
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect();
+
+                let abi_code = parsed_abi.generate_rust_with_call_handlers(&abi.name, &func_refs);
                 fs::write(output_dir.join(format!("{}.rs", module_name)), abi_code)?;
                 abi_modules.push(module_name);
             }
@@ -141,4 +156,16 @@ fn store_codegen_hash(manifest_path: &Path, output_dir: &Path) -> Result<()> {
     let hash_file = output_dir.join(HASH_FILE_NAME);
     fs::write(hash_file, hash)?;
     Ok(())
+}
+
+/// Extract the function name from a function signature.
+///
+/// e.g., "mint(uint256)" -> "mint"
+///       "transfer(address,uint256)" -> "transfer"
+fn extract_function_name(signature: &str) -> String {
+    signature
+        .split('(')
+        .next()
+        .unwrap_or(signature)
+        .to_string()
 }

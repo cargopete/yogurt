@@ -33,7 +33,7 @@ pub use types::*;
 /// ```
 pub mod prelude {
     pub use crate::asc::FromAscPtr;
-    pub use crate::ethereum::{Block, Event, Transaction, TransactionReceipt};
+    pub use crate::ethereum::{Block, Call, Event, Transaction, TransactionReceipt};
     pub use crate::types::{Address, BigDecimal, BigInt, Bytes, Entity, Value};
     pub use crate::{data_source, log};
 
