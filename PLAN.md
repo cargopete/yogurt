@@ -254,7 +254,6 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 2. ~~**Data source templates**~~ ✅ — `dataSource.create()` for factory patterns
 
 **Next:**
-3. **Real-world example subgraph** — Uniswap V2 style with multiple entities, contract calls, derived fields to stress-test codegen
 4. **Documentation site** — Getting started, migration guide, API reference
 
 **Future Work:**
@@ -263,6 +262,7 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 - File watching — `yogurt dev` with auto-rebuild
 
 **Recently Completed:**
+- ✅ Uniswap V2 example subgraph (`tests/integration/uniswap-v2/`)
 - ✅ File data sources and data source templates
 - ✅ Block handlers
 - ✅ Call handlers

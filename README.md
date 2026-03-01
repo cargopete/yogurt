@@ -114,6 +114,26 @@ Requirements:
 - IPFS node running (default: `http://localhost:5001`)
 - graph-node admin API (default: `http://localhost:8020`)
 
+## Example Subgraphs
+
+The `tests/integration/` directory contains working examples:
+
+- **erc20-transfer** — Simple ERC-20 Transfer event indexer
+- **uniswap-v2** — Full Uniswap V2 clone with Factory, Pair, Token entities, data source templates, and contract calls
+
+Test the Uniswap V2 example:
+
+```bash
+# Set your RPC (optional, defaults to public endpoint)
+export ETHEREUM_RPC="https://mainnet.infura.io/v3/YOUR_KEY"
+
+# Run the full test (starts infra, builds, deploys)
+./scripts/test-uniswap-v2.sh
+
+# Monitor indexing progress
+./scripts/test-uniswap-v2.sh --status
+```
+
 ## Architecture
 
 ```
@@ -125,7 +145,7 @@ yogurt/
 │   └── yogurt-macros/    # #[handler] and other proc macros
 ├── scripts/              # Local dev/test scripts
 └── tests/
-    └── integration/      # End-to-end tests
+    └── integration/      # End-to-end example subgraphs
 ```
 
 ## How It Works
