@@ -6,9 +6,10 @@
 
 **Current Phase:** Phase 3 — CLI and Developer Experience
 **Started:** 2026-02-24
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-03-01
 **Phase 1 Complete:** PoC compiles to 16KB WASM, passes 21 binary compatibility tests
 **Phase 2 Complete:** Schema arrays, nullable fields, contract call encoding
+**Phase 3 Progress:** Local graph-node deployment working, test scripts added
 
 ---
 
@@ -120,8 +121,8 @@ yogurt/
 - [x] `yogurt init` — interactive project scaffolding
 - [x] `yogurt codegen` — generate Rust from schema/ABIs
 - [x] `yogurt build` — compile to WASM
-- [x] `yogurt test` — run handler tests (stub)
-- [x] `yogurt deploy` — deploy subgraph (stub)
+- [x] `yogurt test` — run handler tests (stub, needs testing framework)
+- [x] `yogurt deploy` — deploy to local graph-node (IPFS upload, create/deploy API)
 - [x] `yogurt validate` — check WASM exports
 
 ### Build Pipeline
@@ -243,6 +244,24 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 | 2026-02-24 | Use `alloy-json-abi` for ABI parsing | Part of alloy-rs ecosystem, actively maintained |
 | 2026-02-24 | Target Rust 2024 edition | Latest stable, better defaults |
 | 2026-02-24 | Bump allocator (no GC) | Handler lifetime is short, memory never freed |
+
+---
+
+## Roadmap / Next Steps
+
+**High Priority:**
+1. **Real-world example subgraph** — Uniswap V2 style with multiple entities, contract calls, derived fields to stress-test codegen
+2. **Subgraph Studio deployment** — API key auth and Studio deployment API
+3. **Data source templates** — `dataSource.create()` for factory patterns
+
+**Medium Priority:**
+4. **Testing framework** — Mock store, mock `ethereum.call`, event construction helpers
+5. **Block & call handlers** — `blockHandlers` and `callHandlers` in subgraph.yaml
+
+**Lower Priority:**
+6. **File watching** — `yogurt dev` with auto-rebuild
+7. **IPFS integration** — `ipfs.cat`, `ipfs.map`
+8. **Documentation site** — Getting started, migration guide, API reference
 
 ---
 
