@@ -2,6 +2,7 @@
 
 mod schema;
 mod erc20;
+pub mod templates;
 
 pub use schema::*;
 pub use erc20::*;

@@ -2,9 +2,11 @@
 
 use alloc::string::ToString;
 use yogurt_runtime::prelude::*;
+use yogurt_runtime::data_source;
 use yogurt_macros::handler;
 
 use crate::generated::{Transfer, TransferCall, TransferEvent};
+use crate::generated::templates::TokenMetadata;
 
 /// Handle a Transfer event from an ERC-20 contract.
 ///
@@ -33,6 +35,10 @@ pub fn handle_transfer(event: TransferEvent) {
 
     // Save to the store
     transfer.save();
+
+    // Example: spawn a file data source to fetch token metadata
+    // In a real subgraph, you'd get the IPFS hash from contract state
+    // TokenMetadata::create("QmExampleCID...");
 }
 
 /// Handle a transfer() function call.
@@ -62,4 +68,20 @@ pub fn handle_transfer_call(call: TransferCall) {
 
     // Save to the store
     transfer.save();
+}
+
+/// Handle token metadata from IPFS.
+///
+/// This is a file data source handler - it receives the raw file content
+/// and can access the content ID via data_source::string_param().
+#[handler]
+pub fn handle_metadata(content: Bytes) {
+    // Get the IPFS CID that triggered this handler
+    let ipfs_cid = data_source::string_param();
+
+    yogurt_runtime::log_info!("Processing metadata from IPFS: {}", ipfs_cid);
+
+    // In a real handler, you'd parse the content as JSON
+    // and create/update entities based on the metadata
+    let _content_length = content.len();
 }
