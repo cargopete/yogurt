@@ -85,9 +85,13 @@ start_infra() {
 
     log "Waiting for services to be healthy..."
 
-    # Wait for IPFS
+    # Wait for IPFS (use Docker health check)
     local retries=30
-    while ! curl -sf http://localhost:5001/api/v0/id >/dev/null 2>&1; do
+    while true; do
+        local ipfs_health=$(docker inspect --format='{{.State.Health.Status}}' scripts-ipfs-1 2>/dev/null || echo "unknown")
+        if [ "$ipfs_health" = "healthy" ]; then
+            break
+        fi
         retries=$((retries - 1))
         if [ $retries -le 0 ]; then
             log_error "IPFS failed to start"
@@ -98,9 +102,11 @@ start_infra() {
     done
     log_success "IPFS is ready"
 
-    # Wait for graph-node
+    # Wait for graph-node (JSON-RPC, needs POST)
     retries=60
-    while ! curl -sf http://localhost:8020 >/dev/null 2>&1; do
+    while ! curl -sf -X POST -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","method":"subgraph_list","params":{},"id":1}' \
+        http://localhost:8020 >/dev/null 2>&1; do
         retries=$((retries - 1))
         if [ $retries -le 0 ]; then
             log_error "Graph-node failed to start"
