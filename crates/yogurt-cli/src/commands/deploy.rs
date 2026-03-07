@@ -1,14 +1,16 @@
-//! Deploy command — upload and deploy subgraph to a local graph-node.
+//! Deploy command — upload and deploy subgraph to graph-node or Subgraph Studio.
 
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::credentials::Credentials;
 use crate::graph_node::GraphNodeClient;
 use crate::ipfs::IpfsClient;
+use crate::studio::{StudioClient, STUDIO_IPFS_URL};
 
-/// Configuration for deployment.
+/// Configuration for local deployment.
 pub struct DeployConfig {
     pub subgraph_name: String,
     pub manifest_path: String,
@@ -17,11 +19,20 @@ pub struct DeployConfig {
     pub version_label: Option<String>,
 }
 
+/// Configuration for Studio deployment.
+pub struct StudioDeployConfig {
+    pub subgraph_name: String,
+    pub manifest_path: String,
+    pub deploy_key: String,
+    pub version_label: String,
+}
+
 pub async fn run(
     node_url: Option<String>,
     ipfs_url: Option<String>,
     name: Option<String>,
     version: Option<String>,
+    studio: bool,
 ) -> Result<()> {
     println!("{}", style("yogurt deploy").bold().cyan());
     println!();
@@ -50,20 +61,181 @@ pub async fn run(
         );
     }
 
-    let config = DeployConfig {
-        subgraph_name,
-        manifest_path: manifest_path.to_string(),
-        ipfs_url: ipfs_url.unwrap_or_else(|| "http://localhost:5001".to_string()),
-        node_url: node_url.unwrap_or_else(|| "http://localhost:8020".to_string()),
-        version_label: version,
-    };
+    if studio {
+        // Studio deployment requires a version label
+        let version_label = version.ok_or_else(|| {
+            anyhow::anyhow!(
+                "Version required for Studio deployment.\n\
+                 Use: yogurt deploy <name> --studio --version 0.0.1"
+            )
+        })?;
 
-    println!("  Subgraph: {}", style(&config.subgraph_name).yellow());
-    println!("  IPFS:     {}", style(&config.ipfs_url).dim());
-    println!("  Node:     {}", style(&config.node_url).dim());
+        // Load deploy key from credentials
+        let creds = Credentials::load()?;
+        let deploy_key = creds.studio_deploy_key.ok_or_else(|| {
+            anyhow::anyhow!(
+                "No Studio deploy key found.\n\
+                 Run `yogurt auth <deploy-key>` first.\n\
+                 Get your deploy key from https://thegraph.com/studio/"
+            )
+        })?;
+
+        let config = StudioDeployConfig {
+            subgraph_name,
+            manifest_path: manifest_path.to_string(),
+            deploy_key,
+            version_label,
+        };
+
+        println!("  Subgraph: {}", style(&config.subgraph_name).yellow());
+        println!("  Target:   {}", style("Subgraph Studio").cyan());
+        println!("  Version:  {}", style(&config.version_label).dim());
+        println!();
+
+        deploy_to_studio(&config).await
+    } else {
+        let config = DeployConfig {
+            subgraph_name,
+            manifest_path: manifest_path.to_string(),
+            ipfs_url: ipfs_url.unwrap_or_else(|| "http://localhost:5001".to_string()),
+            node_url: node_url.unwrap_or_else(|| "http://localhost:8020".to_string()),
+            version_label: version,
+        };
+
+        println!("  Subgraph: {}", style(&config.subgraph_name).yellow());
+        println!("  IPFS:     {}", style(&config.ipfs_url).dim());
+        println!("  Node:     {}", style(&config.node_url).dim());
+        println!();
+
+        deploy_to_node(&config).await
+    }
+}
+
+async fn deploy_to_studio(config: &StudioDeployConfig) -> Result<()> {
+    // IPFS uploads don't require auth - the public Graph IPFS endpoint is open
+    let ipfs = IpfsClient::new(Some(STUDIO_IPFS_URL));
+    let studio = StudioClient::new(&config.deploy_key);
+
+    // Check IPFS connectivity
+    print!("  Checking IPFS connection... ");
+    ipfs.health_check()
+        .await
+        .context("Graph IPFS not reachable. Check your network connection.")?;
+    println!("{}", style("ok").green());
+
     println!();
 
-    deploy_to_node(&config).await
+    // Parse the manifest
+    let manifest_content = std::fs::read_to_string(&config.manifest_path)
+        .context("Failed to read subgraph.yaml")?;
+    let manifest: serde_yaml::Value =
+        serde_yaml::from_str(&manifest_content).context("Failed to parse subgraph.yaml")?;
+
+    let manifest_dir = Path::new(&config.manifest_path)
+        .parent()
+        .unwrap_or(Path::new("."));
+
+    // Upload files and track their IPFS hashes
+    let mut file_to_ipfs: HashMap<String, String> = HashMap::new();
+
+    // Upload schema
+    if let Some(schema_file) = manifest
+        .get("schema")
+        .and_then(|s| s.get("file"))
+        .and_then(|f| f.as_str())
+    {
+        let schema_path = manifest_dir.join(schema_file);
+        print!("  Uploading schema... ");
+        let hash = ipfs
+            .add_file(&schema_path)
+            .await
+            .context("Failed to upload schema")?;
+        println!("{}", style(&hash).dim());
+        file_to_ipfs.insert(schema_file.to_string(), hash);
+    }
+
+    // Upload ABIs and WASM from data sources
+    if let Some(data_sources) = manifest.get("dataSources").and_then(|ds| ds.as_sequence()) {
+        for ds in data_sources {
+            if let Some(mapping) = ds.get("mapping") {
+                // Upload ABIs
+                if let Some(abis) = mapping.get("abis").and_then(|a| a.as_sequence()) {
+                    for abi in abis {
+                        if let Some(abi_file) = abi.get("file").and_then(|f| f.as_str()) {
+                            if !file_to_ipfs.contains_key(abi_file) {
+                                let abi_path = manifest_dir.join(abi_file);
+                                let abi_name = abi
+                                    .get("name")
+                                    .and_then(|n| n.as_str())
+                                    .unwrap_or("ABI");
+                                print!("  Uploading {} ABI... ", abi_name);
+                                let hash = ipfs
+                                    .add_file(&abi_path)
+                                    .await
+                                    .with_context(|| format!("Failed to upload {}", abi_file))?;
+                                println!("{}", style(&hash).dim());
+                                file_to_ipfs.insert(abi_file.to_string(), hash);
+                            }
+                        }
+                    }
+                }
+
+                // Upload WASM
+                if let Some(wasm_file) = mapping.get("file").and_then(|f| f.as_str()) {
+                    if !file_to_ipfs.contains_key(wasm_file) {
+                        let wasm_path = Path::new("build/subgraph.wasm");
+                        print!("  Uploading WASM... ");
+                        let hash = ipfs
+                            .add_file(wasm_path)
+                            .await
+                            .context("Failed to upload WASM")?;
+                        println!("{}", style(&hash).dim());
+                        file_to_ipfs.insert(wasm_file.to_string(), hash);
+                    }
+                }
+            }
+        }
+    }
+
+    // Create resolved manifest with IPFS paths
+    print!("  Creating resolved manifest... ");
+    let resolved_manifest = resolve_manifest(&manifest, &file_to_ipfs)?;
+    let resolved_yaml =
+        serde_yaml::to_string(&resolved_manifest).context("Failed to serialize manifest")?;
+    let manifest_hash = ipfs
+        .add_str(&resolved_yaml, "subgraph.yaml")
+        .await
+        .context("Failed to upload manifest")?;
+    println!("{}", style(&manifest_hash).dim());
+
+    println!();
+
+    // Deploy to Studio (no create step — must be created in web UI)
+    print!("  Deploying to Studio... ");
+    studio
+        .deploy(&config.subgraph_name, &manifest_hash, &config.version_label)
+        .await
+        .context("Failed to deploy to Studio")?;
+    println!("{}", style("ok").green());
+
+    println!();
+    println!("{}", style("✓ Deployment complete").green());
+    println!();
+    println!(
+        "  Subgraph ID: {}",
+        style(format!("/ipfs/{}", manifest_hash)).yellow()
+    );
+    println!(
+        "  Query URL:   https://api.studio.thegraph.com/query/<ID>/{}/{}",
+        config.subgraph_name, config.version_label
+    );
+    println!();
+    println!(
+        "  {}",
+        style("Publish to the decentralized network at https://thegraph.com/studio/").dim()
+    );
+
+    Ok(())
 }
 
 async fn deploy_to_node(config: &DeployConfig) -> Result<()> {

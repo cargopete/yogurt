@@ -137,7 +137,7 @@ yogurt/
 ### Deployment
 
 - [x] IPFS upload integration
-- [ ] Subgraph Studio deployment
+- [x] Subgraph Studio deployment
 - [x] Self-hosted graph-node deployment
 - [ ] Decentralized network deployment
 
@@ -257,11 +257,11 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 4. **Documentation site** — Getting started, migration guide, API reference
 
 **Future Work:**
-- Subgraph Studio deployment — API key auth and Studio deployment API
 - Testing framework — Enhanced mock store, mock `ethereum.call`, event construction helpers
 - File watching — `yogurt dev` with auto-rebuild
 
 **Recently Completed:**
+- ✅ Subgraph Studio deployment (`yogurt auth` + `yogurt deploy --studio`)
 - ✅ Uniswap V2 example subgraph (`tests/integration/uniswap-v2/`)
 - ✅ File data sources and data source templates
 - ✅ Block handlers

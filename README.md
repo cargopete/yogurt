@@ -4,6 +4,8 @@ A Rust toolchain for The Graph subgraphs.
 
 Write your subgraph mapping handlers in Rust instead of AssemblyScript. yogurt compiles to WASM modules that are binary-compatible with graph-node's existing runtime — zero modifications required.
 
+> **March 2026:** The first-ever Rust subgraph was deployed to Subgraph Studio. Graph-node didn't even notice. 🎉
+
 ## Status
 
 🚧 **Early development** — not yet production-ready.
@@ -13,14 +15,14 @@ Write your subgraph mapping handlers in Rust instead of AssemblyScript. yogurt c
 - `yogurt codegen` — generate Rust types from schema/ABIs
 - `yogurt build` — compile to WASM with optional wasm-opt
 - `yogurt validate` — check WASM binary compatibility
-- `yogurt deploy` — deploy to local graph-node
+- `yogurt deploy` — deploy to local graph-node or Subgraph Studio
+- `yogurt auth` — store Studio deploy key
 - Event handlers, block handlers, call handlers
 - Data source templates (`dataSource.create()`)
 - File data sources (IPFS/Arweave)
 - Contract calls (`ethereum.call`)
 
 **Coming soon:**
-- Subgraph Studio deployment
 - Testing framework improvements
 
 ## Installation
@@ -110,9 +112,17 @@ yogurt deploy myaccount/my-subgraph \
   --version v1.0.0
 ```
 
-Requirements:
-- IPFS node running (default: `http://localhost:5001`)
-- graph-node admin API (default: `http://localhost:8020`)
+### Subgraph Studio
+
+```bash
+# Store your deploy key (from Studio dashboard)
+yogurt auth <your-deploy-key>
+
+# Deploy to Studio
+yogurt deploy my-subgraph --studio --version 0.0.1
+```
+
+The subgraph must be created in the [Studio web UI](https://thegraph.com/studio/) first.
 
 ## Example Subgraphs
 

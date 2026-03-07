@@ -10,6 +10,7 @@ use serde::Deserialize;
 pub struct IpfsClient {
     base_url: String,
     client: reqwest::Client,
+    auth_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -19,9 +20,38 @@ struct AddResponse {
     #[serde(rename = "Name")]
     #[allow(dead_code)]
     name: String,
+    /// Size can be string (local IPFS) or integer (The Graph's IPFS)
     #[serde(rename = "Size")]
     #[allow(dead_code)]
-    size: String,
+    #[serde(deserialize_with = "deserialize_size")]
+    size: u64,
+}
+
+fn deserialize_size<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+
+    struct SizeVisitor;
+
+    impl<'de> Visitor<'de> for SizeVisitor {
+        type Value = u64;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string or integer")
+        }
+
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<u64, E> {
+            Ok(v)
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<u64, E> {
+            v.parse().map_err(de::Error::custom)
+        }
+    }
+
+    deserializer.deserialize_any(SizeVisitor)
 }
 
 impl IpfsClient {
@@ -35,14 +65,32 @@ impl IpfsClient {
                 .trim_end_matches('/')
                 .to_string(),
             client: reqwest::Client::new(),
+            auth_token: None,
+        }
+    }
+
+    /// Create a new IPFS client with authentication.
+    ///
+    /// Used for Subgraph Studio's IPFS endpoint which requires a deploy key.
+    pub fn with_auth(base_url: &str, token: &str) -> Self {
+        Self {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            client: reqwest::Client::new(),
+            auth_token: Some(token.to_string()),
         }
     }
 
     /// Check if the IPFS node is reachable.
     pub async fn health_check(&self) -> Result<()> {
-        let url = format!("{}/api/v0/id", self.base_url);
-        self.client
-            .post(&url)
+        // Use /version instead of /id — The Graph's IPFS blocks /id
+        let url = format!("{}/api/v0/version", self.base_url);
+        let mut request = self.client.post(&url);
+
+        if let Some(token) = &self.auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        request
             .send()
             .await
             .context("Failed to connect to IPFS node")?
@@ -60,13 +108,13 @@ impl IpfsClient {
         let part = multipart::Part::bytes(data).file_name(filename.to_string());
         let form = multipart::Form::new().part("file", part);
 
-        let response = self
-            .client
-            .post(&url)
-            .multipart(form)
-            .send()
-            .await
-            .context("Failed to upload to IPFS")?;
+        let mut request = self.client.post(&url).multipart(form);
+
+        if let Some(token) = &self.auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request.send().await.context("Failed to upload to IPFS")?;
 
         let status = response.status();
         if !status.is_success() {

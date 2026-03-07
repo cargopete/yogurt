@@ -1,8 +1,10 @@
 //! yogurt CLI — Rust toolchain for The Graph subgraphs
 
 mod commands;
+mod credentials;
 mod graph_node;
 mod ipfs;
+mod studio;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -45,7 +47,7 @@ enum Commands {
         wasm: bool,
     },
 
-    /// Deploy the subgraph to a local graph-node
+    /// Deploy the subgraph to graph-node or Subgraph Studio
     Deploy {
         /// Subgraph name (format: account/subgraph-name)
         name: Option<String>,
@@ -61,6 +63,16 @@ enum Commands {
         /// Version label for this deployment
         #[arg(short, long)]
         version: Option<String>,
+
+        /// Deploy to Subgraph Studio instead of local graph-node
+        #[arg(long)]
+        studio: bool,
+    },
+
+    /// Store Subgraph Studio deploy key
+    Auth {
+        /// Deploy key from Subgraph Studio
+        deploy_key: String,
     },
 
     /// Validate WASM exports for graph-node compatibility
@@ -80,9 +92,10 @@ async fn main() -> Result<()> {
         Commands::Codegen { manifest } => commands::codegen::run(&manifest),
         Commands::Build { release } => commands::build::run(release),
         Commands::Test { wasm } => commands::test::run(wasm),
-        Commands::Deploy { name, node, ipfs, version } => {
-            commands::deploy::run(node, ipfs, name, version).await
+        Commands::Deploy { name, node, ipfs, version, studio } => {
+            commands::deploy::run(node, ipfs, name, version, studio).await
         }
+        Commands::Auth { deploy_key } => commands::auth::run(&deploy_key),
         Commands::Validate { wasm_file } => commands::validate::run(&wasm_file),
     }
 }
