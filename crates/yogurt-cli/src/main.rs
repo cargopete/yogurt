@@ -47,6 +47,13 @@ enum Commands {
         wasm: bool,
     },
 
+    /// Watch for changes and auto-rebuild
+    Dev {
+        /// Path to subgraph.yaml
+        #[arg(short, long, default_value = "subgraph.yaml")]
+        manifest: String,
+    },
+
     /// Deploy the subgraph to graph-node or Subgraph Studio
     Deploy {
         /// Subgraph name (format: account/subgraph-name)
@@ -81,6 +88,13 @@ enum Commands {
         #[arg(default_value = "build/subgraph.wasm")]
         wasm_file: String,
     },
+
+    /// Inspect WASM module details (imports, exports, memory)
+    Inspect {
+        /// Path to compiled WASM file
+        #[arg(default_value = "build/subgraph.wasm")]
+        wasm_file: String,
+    },
 }
 
 #[tokio::main]
@@ -92,10 +106,12 @@ async fn main() -> Result<()> {
         Commands::Codegen { manifest } => commands::codegen::run(&manifest),
         Commands::Build { release } => commands::build::run(release),
         Commands::Test { wasm } => commands::test::run(wasm),
+        Commands::Dev { manifest } => commands::dev::run(&manifest),
         Commands::Deploy { name, node, ipfs, version, studio } => {
             commands::deploy::run(node, ipfs, name, version, studio).await
         }
         Commands::Auth { deploy_key } => commands::auth::run(&deploy_key),
         Commands::Validate { wasm_file } => commands::validate::run(&wasm_file),
+        Commands::Inspect { wasm_file } => commands::inspect::run(&wasm_file),
     }
 }

@@ -10,8 +10,17 @@ pub fn run(wasm: bool) -> Result<()> {
 
     if wasm {
         println!("  Running tests in WASM mode...");
-        // TODO: Implement WASM test runner
-        anyhow::bail!("WASM test mode not yet implemented");
+        println!();
+        println!(
+            "  {} WASM test mode runs handlers in actual WASM for higher fidelity.",
+            style("Note:").yellow()
+        );
+        println!("  This feature is planned but not yet implemented.");
+        println!();
+        println!("  For now, use native tests (without --wasm flag) which provide");
+        println!("  fast iteration with the full testing framework.");
+        println!();
+        anyhow::bail!("WASM test mode not yet implemented. Use native tests instead.");
     }
 
     // Run native tests via cargo test

@@ -1,9 +1,14 @@
 //! Data source utilities for dynamic data source creation.
 
 use alloc::string::String;
+
+#[cfg(target_arch = "wasm32")]
 use alloc::vec::Vec;
 
+#[cfg(target_arch = "wasm32")]
 use crate::asc::{asc_to_bytes, asc_to_string, str_to_asc, AscPtr};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::asc::{asc_to_bytes, asc_to_string, AscPtr};
 use crate::types::{Address, EntityData};
 
 /// Create a new data source from a template.
@@ -27,14 +32,39 @@ pub fn create(name: &str, params: &[String]) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn create(_name: &str, _params: &[String]) {}
+pub fn create(_name: &str, _params: &[String]) {
+    // No-op in tests - templates don't spawn real data sources
+}
 
 /// Create a new data source from a template with context.
 ///
 /// The context is an entity that will be available to handlers
 /// via `data_source::context()`.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut context = EntityData::new();
+/// context.set("poolId", Value::String("pool-123".into()));
+/// data_source::create_with_context("Pool", &[pool_address.to_hex()], context);
+/// ```
+#[cfg(target_arch = "wasm32")]
+pub fn create_with_context(name: &str, params: &[String], context: EntityData) {
+    let name_ptr = str_to_asc(name);
+    let params_ptr = strings_to_asc_array(params);
+    let context_ptr = crate::store::serialize_entity(&context);
+    unsafe {
+        crate::host::data_source_create_with_context(
+            name_ptr.as_i32(),
+            params_ptr as i32,
+            context_ptr.as_i32(),
+        );
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn create_with_context(_name: &str, _params: &[String], _context: EntityData) {
-    // TODO: Implement with context support
+    // No-op in tests - templates don't spawn real data sources
 }
 
 /// Get the address of the current data source.
@@ -47,7 +77,7 @@ pub fn address() -> Address {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn address() -> Address {
-    Address::zero()
+    crate::testing::get_mock_data_source_address()
 }
 
 /// Get the network name of the current data source (e.g., "mainnet", "goerli").
@@ -59,22 +89,26 @@ pub fn network() -> String {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn network() -> String {
-    String::from("mainnet")
+    crate::testing::get_mock_data_source_network()
 }
 
 /// Get the context entity for the current data source.
 ///
 /// Only available if the data source was created with `create_with_context`.
+/// Returns an empty EntityData if no context was set.
 #[cfg(target_arch = "wasm32")]
 pub fn context() -> EntityData {
-    let _ptr = unsafe { crate::host::data_source_context() };
-    // TODO: Deserialize context entity
-    EntityData::new()
+    let ptr = unsafe { crate::host::data_source_context() };
+    if ptr == 0 {
+        EntityData::new()
+    } else {
+        crate::store::deserialize_entity(AscPtr::new(ptr as u32))
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn context() -> EntityData {
-    EntityData::new()
+    crate::testing::get_mock_data_source_context()
 }
 
 /// Get the string parameter for a file data source.
@@ -102,7 +136,10 @@ pub fn string_param() -> String {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn string_param() -> String {
-    String::new()
+    // For file data sources, the "address" field contains the content identifier
+    // encoded as bytes. We decode it as UTF-8 to get the string.
+    let addr = address();
+    String::from_utf8_lossy(addr.as_bytes()).into_owned()
 }
 
 // ============================================================================

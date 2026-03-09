@@ -15,6 +15,7 @@ clap = { workspace = true }
 dialoguer = { workspace = true }
 console = { workspace = true }
 indicatif = { workspace = true }
+dirs = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
@@ -23,6 +24,8 @@ reqwest = { workspace = true }
 walrus = { workspace = true }
 anyhow = { workspace = true }
 wasmparser = { workspace = true }
+notify = { workspace = true }
+notify-debouncer-mini = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

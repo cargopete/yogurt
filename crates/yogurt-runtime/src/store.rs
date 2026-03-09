@@ -35,8 +35,8 @@ pub fn get(entity_type: &str, id: &str) -> Option<EntityData> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn get(_entity_type: &str, _id: &str) -> Option<EntityData> {
-    None
+pub fn get(entity_type: &str, id: &str) -> Option<EntityData> {
+    crate::testing::store_get(entity_type, id)
 }
 
 /// Write an entity to the store.
@@ -52,7 +52,9 @@ pub fn set(entity_type: &str, id: &str, data: &EntityData) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn set(_entity_type: &str, _id: &str, _data: &EntityData) {}
+pub fn set(entity_type: &str, id: &str, data: &EntityData) {
+    crate::testing::store_set(entity_type, id, data);
+}
 
 /// Remove an entity from the store.
 #[cfg(target_arch = "wasm32")]
@@ -66,7 +68,57 @@ pub fn remove(entity_type: &str, id: &str) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn remove(_entity_type: &str, _id: &str) {}
+pub fn remove(entity_type: &str, id: &str) {
+    crate::testing::store_remove(entity_type, id);
+}
+
+/// Load an entity that was created or modified in the current block.
+///
+/// This is a faster alternative to `get()` when you know the entity was
+/// modified in the current block. It avoids a database roundtrip by only
+/// checking the in-memory block cache.
+///
+/// Returns `None` if:
+/// - The entity does not exist, OR
+/// - The entity exists but was NOT modified in the current block
+///
+/// # Example
+///
+/// ```ignore
+/// // In a handler that runs after another handler in the same block:
+/// let transfer = store::get_in_block("Transfer", &tx_hash);
+/// if transfer.is_none() {
+///     // Entity wasn't created in this block, check the full store
+///     let transfer = store::get("Transfer", &tx_hash);
+/// }
+/// ```
+///
+/// # Use Case
+///
+/// This is useful when one handler creates an entity and a later handler
+/// (in the same block) needs to access it. Using `get_in_block` is faster
+/// because it only checks the current block's changes.
+#[cfg(target_arch = "wasm32")]
+pub fn get_in_block(entity_type: &str, id: &str) -> Option<EntityData> {
+    let type_ptr = str_to_asc(entity_type);
+    let id_ptr = str_to_asc(id);
+
+    let result = unsafe { crate::host::store_get_in_block(type_ptr.as_i32(), id_ptr.as_i32()) };
+
+    if result == 0 {
+        None
+    } else {
+        Some(deserialize_entity(AscPtr::new(result as u32)))
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn get_in_block(entity_type: &str, id: &str) -> Option<EntityData> {
+    // In test mode, we simulate loadInBlock by checking if the entity
+    // was modified in the current "block" (test context).
+    // For simplicity, we delegate to the testing module which can track this.
+    crate::testing::store_get_in_block(entity_type, id)
+}
 
 // ============================================================================
 // Serialization: Rust EntityData → AssemblyScript memory
@@ -74,7 +126,7 @@ pub fn remove(_entity_type: &str, _id: &str) {}
 
 /// Serialize entity data to an AssemblyScript TypedMap pointer.
 #[cfg(target_arch = "wasm32")]
-fn serialize_entity(data: &EntityData) -> AscPtr<AscEntity> {
+pub fn serialize_entity(data: &EntityData) -> AscPtr<AscEntity> {
     // Collect entries
     let entries: Vec<_> = data.iter().collect();
     let entry_count = entries.len();
@@ -237,7 +289,7 @@ fn serialize_value_array(values: &[Value]) -> AscPtr<crate::asc::AscArray<AscSto
 
 /// Deserialize entity data from an AssemblyScript TypedMap pointer.
 #[cfg(target_arch = "wasm32")]
-fn deserialize_entity(ptr: AscPtr<AscEntity>) -> EntityData {
+pub fn deserialize_entity(ptr: AscPtr<AscEntity>) -> EntityData {
     let mut data = EntityData::new();
 
     if ptr.is_null() {

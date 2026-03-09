@@ -18,6 +18,9 @@ mod imports {
         #[link_name = "store.remove"]
         pub fn store_remove(entity_type: i32, id: i32);
 
+        #[link_name = "store.get_in_block"]
+        pub fn store_get_in_block(entity_type: i32, id: i32) -> i32;
+
         // Ethereum
         #[link_name = "ethereum.call"]
         pub fn ethereum_call(call: i32) -> i32;
@@ -78,6 +81,9 @@ mod imports {
         #[link_name = "bigInt.rightShift"]
         pub fn big_int_right_shift(a: i32, bits: i32) -> i32;
 
+        #[link_name = "bigInt.fromString"]
+        pub fn big_int_from_string(s: i32) -> i32;
+
         // BigDecimal
         #[link_name = "bigDecimal.plus"]
         pub fn big_decimal_plus(a: i32, b: i32) -> i32;
@@ -134,6 +140,9 @@ mod imports {
         // Data source
         #[link_name = "dataSource.create"]
         pub fn data_source_create(name: i32, params: i32);
+
+        #[link_name = "dataSource.createWithContext"]
+        pub fn data_source_create_with_context(name: i32, params: i32, context: i32);
 
         #[link_name = "dataSource.address"]
         pub fn data_source_address() -> i32;

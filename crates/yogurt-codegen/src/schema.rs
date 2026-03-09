@@ -229,10 +229,112 @@ fn generate_entity_struct(entity: &Entity) -> String {
             }}\n\n\
             fn remove(id: &str) {{\n\
                 store::remove(Self::ENTITY_TYPE, id);\n\
+            }}\n\n\
+            fn create(id: impl Into<String>) -> Self {{\n\
+                Self::new(id)\n\
             }}\n\
-        }}\n",
+        }}\n\n",
         name = name
     ));
+
+    // TestableEntity trait implementation (native builds only)
+    code.push_str(&format!(
+        "#[cfg(not(target_arch = \"wasm32\"))]\n\
+         impl yogurt_runtime::testing::TestableEntity for {name} {{\n\
+             fn as_data(&self) -> &EntityData {{\n\
+                 &self.data\n\
+             }}\n\n\
+             fn from_data(data: EntityData) -> Self {{\n\
+                 Self {{ data }}\n\
+             }}\n\
+         }}\n\n",
+        name = name
+    ));
+
+    // Generate builder pattern
+    code.push_str(&generate_entity_builder(entity));
+
+    code
+}
+
+/// Generate a fluent builder for an entity.
+///
+/// Creates a `{Entity}Builder` struct with chainable setter methods
+/// and a `build()` method that returns the entity.
+fn generate_entity_builder(entity: &Entity) -> String {
+    let name = &entity.name;
+    let builder_name = format!("{}Builder", name);
+
+    let mut code = String::new();
+
+    // Builder struct
+    code.push_str(&format!(
+        "/// Fluent builder for `{name}` entities.\n\
+         ///\n\
+         /// # Example\n\
+         ///\n\
+         /// ```ignore\n\
+         /// let entity = {name}::builder(\"my-id\")\n\
+         ///     .field_name(value)\n\
+         ///     .build();\n\
+         /// ```\n\
+         pub struct {builder_name} {{\n\
+             inner: {name},\n\
+         }}\n\n",
+        name = name,
+        builder_name = builder_name
+    ));
+
+    // Add builder() method to entity
+    code.push_str(&format!(
+        "impl {name} {{\n\
+             /// Create a new builder for this entity type.\n\
+             ///\n\
+             /// # Example\n\
+             ///\n\
+             /// ```ignore\n\
+             /// let entity = {name}::builder(\"my-id\")\n\
+             ///     .field_name(value)\n\
+             ///     .build();\n\
+             /// ```\n\
+             pub fn builder(id: impl Into<String>) -> {builder_name} {{\n\
+                 {builder_name} {{\n\
+                     inner: {name}::new(id),\n\
+                 }}\n\
+             }}\n\
+         }}\n\n",
+        name = name,
+        builder_name = builder_name
+    ));
+
+    // Builder impl with chainable setters
+    code.push_str(&format!("impl {builder_name} {{\n", builder_name = builder_name));
+
+    // Generate chainable setter for each field (except id and derived)
+    for field in &entity.fields {
+        if field.is_derived || field.name == "id" {
+            continue;
+        }
+
+        let setter = generate_builder_setter(field);
+        code.push_str(&setter);
+    }
+
+    // build() method
+    code.push_str(&format!(
+        "    /// Consume the builder and return the constructed `{name}`.\n\
+             pub fn build(self) -> {name} {{\n\
+                 self.inner\n\
+             }}\n\n\
+             /// Consume the builder, save the entity, and return it.\n\
+             pub fn save(self) -> {name} {{\n\
+                 self.inner.save();\n\
+                 self.inner\n\
+             }}\n",
+        name = name
+    ));
+
+    code.push_str("}\n");
 
     code
 }
@@ -437,6 +539,49 @@ fn generate_setter(field: &Field) -> String {
     }
 
     result
+}
+
+/// Generate a chainable builder setter method.
+fn generate_builder_setter(field: &Field) -> String {
+    let name = &field.name;
+    let snake_name = to_snake_case(name);
+
+    // Get the parameter type based on field type
+    let param_type = match &field.field_type {
+        FieldType::Id | FieldType::String => "impl Into<String>".to_string(),
+        FieldType::Int => "i32".to_string(),
+        FieldType::Int8 => "i64".to_string(),
+        FieldType::BigInt => "impl Into<BigInt>".to_string(),
+        FieldType::BigDecimal => "impl Into<BigDecimal>".to_string(),
+        FieldType::Bytes => "impl Into<Bytes>".to_string(),
+        FieldType::Boolean => "bool".to_string(),
+        FieldType::Array(inner) => {
+            match inner.as_ref() {
+                FieldType::String | FieldType::Id | FieldType::Reference(_) => {
+                    "impl IntoIterator<Item = impl Into<String>>".to_string()
+                }
+                FieldType::Bytes => "impl IntoIterator<Item = impl Into<Bytes>>".to_string(),
+                FieldType::BigInt => "impl IntoIterator<Item = impl Into<BigInt>>".to_string(),
+                FieldType::BigDecimal => "impl IntoIterator<Item = impl Into<BigDecimal>>".to_string(),
+                FieldType::Int => "impl IntoIterator<Item = i32>".to_string(),
+                FieldType::Int8 => "impl IntoIterator<Item = i64>".to_string(),
+                FieldType::Boolean => "impl IntoIterator<Item = bool>".to_string(),
+                FieldType::Array(_) => return String::new(), // Skip nested arrays
+            }
+        }
+        FieldType::Reference(_) => "impl Into<String>".to_string(),
+    };
+
+    format!(
+        "    /// Set the `{name}` field.\n\
+             pub fn {snake_name}(mut self, val: {param_type}) -> Self {{\n\
+                 self.inner.set_{snake_name}(val);\n\
+                 self\n\
+             }}\n\n",
+        name = name,
+        snake_name = snake_name,
+        param_type = param_type
+    )
 }
 
 fn to_snake_case(s: &str) -> String {

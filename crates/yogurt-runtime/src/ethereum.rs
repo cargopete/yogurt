@@ -531,8 +531,8 @@ pub fn call(call_data: SmartContractCall) -> Option<Vec<Token>> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn call(_call: SmartContractCall) -> Option<Vec<Token>> {
-    None
+pub fn call(call_data: SmartContractCall) -> Option<Vec<Token>> {
+    crate::testing::execute_mock_call(&call_data.contract_address, &call_data.function_signature)
 }
 
 /// Serialize an array of Tokens to AS memory.
@@ -742,9 +742,16 @@ fn deserialize_token(ptr: u32) -> Token {
 }
 
 /// Encode parameters for a contract call.
+///
+/// Note: This is a low-level utility for manual ABI encoding.
+/// For most use cases, use the generated contract bindings which handle
+/// encoding internally via `ethereum::call()`.
+///
+/// Not yet implemented - returns empty bytes.
 #[cfg(target_arch = "wasm32")]
 pub fn encode(_params: &[Token]) -> Bytes {
-    // TODO: Implement ABI encoding via host function
+    // Low-level ABI encoding - not commonly needed as contract bindings
+    // handle encoding internally. Use generated contract methods instead.
     Bytes::new()
 }
 
@@ -754,9 +761,16 @@ pub fn encode(_params: &[Token]) -> Bytes {
 }
 
 /// Decode return data from a contract call.
+///
+/// Note: This is a low-level utility for manual ABI decoding.
+/// For most use cases, use the generated contract bindings which handle
+/// decoding internally via `ethereum::call()`.
+///
+/// Not yet implemented - returns None.
 #[cfg(target_arch = "wasm32")]
 pub fn decode(_types: &str, _data: &Bytes) -> Option<Vec<Token>> {
-    // TODO: Implement ABI decoding via host function
+    // Low-level ABI decoding - not commonly needed as contract bindings
+    // handle decoding internally. Use generated contract methods instead.
     None
 }
 

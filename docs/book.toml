@@ -1,0 +1,20 @@
+[book]
+title = "yogurt"
+authors = ["yogurt contributors"]
+description = "Write The Graph subgraphs in Rust"
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/example/yogurt"
+edit-url-template = "https://github.com/example/yogurt/edit/main/docs/{path}"
+site-url = "/yogurt/"
+cname = ""
+additional-css = []
+additional-js = []
+no-section-label = false

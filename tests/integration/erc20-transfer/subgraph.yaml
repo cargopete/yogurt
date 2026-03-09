@@ -29,7 +29,11 @@ dataSources:
 templates:
   - name: TokenMetadata
     kind: file/ipfs
+    network: mainnet
+    source:
+      abi: ERC20
     mapping:
+      kind: ethereum/events
       apiVersion: 0.0.7
       language: wasm/rust
       entities:

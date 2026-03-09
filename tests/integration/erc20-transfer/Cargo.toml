@@ -4,11 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 yogurt-runtime = { path = "../../../crates/yogurt-runtime" }
 yogurt-macros = { path = "../../../crates/yogurt-macros" }
+
+[dev-dependencies]
+# No extra dev dependencies needed - yogurt-runtime includes testing utilities
 
 [profile.release]
 opt-level = "z"

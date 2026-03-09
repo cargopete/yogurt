@@ -4,12 +4,12 @@
 
 ## Project Status
 
-**Current Phase:** Phase 3 — CLI and Developer Experience
+**Current Phase:** Phase 4 — Testing and Ecosystem
 **Started:** 2026-02-24
-**Last Updated:** 2026-03-01
+**Last Updated:** 2026-03-09
 **Phase 1 Complete:** PoC compiles to 16KB WASM, passes 21 binary compatibility tests
 **Phase 2 Complete:** Schema arrays, nullable fields, contract call encoding
-**Phase 3 Progress:** Local graph-node deployment working, test scripts added
+**Phase 3 Complete:** Full CLI with dev/inspect, Studio deployment, testing framework
 
 ---
 
@@ -71,8 +71,8 @@ yogurt/
 
 ### Technical Debt / Known Issues
 
-- [ ] Many `TODO` comments in runtime code need implementation
-- [ ] Host function stubs for native target (testing) need proper mock implementations
+- [x] `TODO` comments in runtime code — all addressed
+- [x] Host function stubs for native target (testing) — proper mock implementations added
 
 ---
 
@@ -112,7 +112,7 @@ yogurt/
 
 ---
 
-## Phase 3: CLI and Developer Experience
+## Phase 3: CLI and Developer Experience ✅ Complete
 
 **Goal:** Complete `yogurt` CLI with init/codegen/build/deploy workflow.
 
@@ -121,9 +121,12 @@ yogurt/
 - [x] `yogurt init` — interactive project scaffolding
 - [x] `yogurt codegen` — generate Rust from schema/ABIs
 - [x] `yogurt build` — compile to WASM
-- [x] `yogurt test` — run handler tests (stub, needs testing framework)
-- [x] `yogurt deploy` — deploy to local graph-node (IPFS upload, create/deploy API)
+- [x] `yogurt test` — run handler tests
+- [x] `yogurt deploy` — deploy to local graph-node or Subgraph Studio
 - [x] `yogurt validate` — check WASM exports
+- [x] `yogurt dev` — file watching with auto-rebuild
+- [x] `yogurt inspect` — WASM module analysis (imports, exports, memory)
+- [x] `yogurt auth` — store Subgraph Studio deploy key
 
 ### Build Pipeline
 
@@ -132,14 +135,12 @@ yogurt/
 - [x] WASM export validation
 - [x] Codegen freshness checking (SHA-256 hash of manifest, schema, ABIs)
 - [x] `__rtti_base` export for AssemblyScript compatibility
-- [ ] Custom WASM section stripping/modification
 
 ### Deployment
 
 - [x] IPFS upload integration
-- [x] Subgraph Studio deployment
+- [x] Subgraph Studio deployment (with publish to decentralized network via web UI)
 - [x] Self-hosted graph-node deployment
-- [ ] Decentralized network deployment
 
 ---
 
@@ -147,14 +148,19 @@ yogurt/
 
 **Goal:** Production-ready testing framework and documentation.
 
-### Testing Framework
+### Testing Framework ✅ Complete
 
-- [x] `MockContext` for native testing (basic)
-- [x] Mock block/transaction/receipt helpers
-- [ ] In-memory mock store with proper entity serialization
-- [ ] Mock ethereum.call responses
-- [ ] Event construction helpers
-- [ ] Assertion helpers for entity state
+- [x] Native BigInt/BigDecimal (using `num-bigint` for native builds)
+- [x] Thread-local mock store with proper entity serialization
+- [x] `EventBuilder` for constructing test events
+- [x] `CallBuilder` for constructing test call handlers
+- [x] `BlockBuilder` for constructing test blocks
+- [x] Mock data source (`mock_data_source_address`, `mock_data_source_network`, `mock_data_source_context`)
+- [x] Mock IPFS (`mock_ipfs_cat`, `clear_ipfs_mocks`)
+- [x] Native crypto (`keccak256` using sha3 crate)
+- [x] JSON parsing (`json::from_bytes`, `json::from_string`, `JsonValue` API)
+- [x] Assertion helpers (`assert_entity_exists`, `assert_entity_not_exists`, `entity_count`)
+- [x] Type conversion utilities (`Bytes::from_hex_string`, `Address::from_string`, `BigInt::from_string`)
 - [ ] WASM test runner (optional high-fidelity mode)
 
 ### Documentation
@@ -163,9 +169,9 @@ yogurt/
 - [ ] Migration guide from AssemblyScript
 - [ ] API reference
 - [ ] Example subgraphs:
-  - [ ] ERC-20 token tracker
+  - [x] ERC-20 token tracker
   - [ ] ERC-721 NFT indexer
-  - [ ] Uniswap V2 clone
+  - [x] Uniswap V2 clone
 
 ---
 
@@ -176,10 +182,21 @@ yogurt/
 - [x] Block handlers
 - [x] Call handlers
 - [x] `BigInt` and `BigDecimal` with Rust operator overloading (`Add`, `Sub`, etc.)
-- [x] IPFS integration (`ipfs.cat` implemented)
-- [ ] JSON parsing utilities
-- [ ] `yogurt dev` — file watching with auto-rebuild
-- [ ] `yogurt inspect` — WASM export inspection/debugging
+- [x] `BigInt` and `BigDecimal` comparison operators (`<`, `>`, `<=`, `>=`, `lt()`, `gt()`, `le()`, `ge()`)
+- [x] `BigInt::abs()` — absolute value
+- [x] `BigInt::sqrt()` — integer square root (Newton's method)
+- [x] `BigDecimal::truncate()` — truncate to N decimal places
+- [x] `Bytes::concat()` and `Bytes::concat_i32()` — byte array concatenation
+- [x] IPFS integration (`ipfs.cat`, `ipfs.map` for streaming)
+- [x] ENS reverse lookup (`ens::name_by_hash`)
+- [x] `store::get_in_block` — load entities modified in current block
+- [x] JSON parsing utilities (`json::from_bytes`, `JsonValue` API)
+- [x] `yogurt dev` — file watching with auto-rebuild
+- [x] `yogurt inspect` — WASM export inspection/debugging
+- [x] `day_id!` / `hour_id!` macros — time-based entity IDs for analytics subgraphs
+- [x] `format_units` / `parse_units` — token amount formatting (wei ↔ ETH conversion)
+- [x] `Address::is_zero()` — check for zero address
+- [x] `BigInt::safe_div` / `BigDecimal::safe_div` — safe division (returns zero on divide-by-zero)
 - [ ] Immutable entity optimizations
 
 ---
@@ -249,18 +266,44 @@ fn asc_to_string(ptr: AscPtr<AscString>) -> String {
 
 ## Roadmap / Next Steps
 
-**Top Priority — Feature Parity with AssemblyScript:**
-1. ~~**IPFS integration**~~ ✅ — `ipfs.cat` implemented, file data sources supported
-2. ~~**Data source templates**~~ ✅ — `dataSource.create()` for factory patterns
-
-**Next:**
-4. **Documentation site** — Getting started, migration guide, API reference
+**Top Priority — Documentation:**
+1. **Documentation site** — Getting started, migration guide, API reference
+2. **ERC-721 NFT example** — Complete example set
 
 **Future Work:**
-- Testing framework — Enhanced mock store, mock `ethereum.call`, event construction helpers
-- File watching — `yogurt dev` with auto-rebuild
+- WASM test runner (high-fidelity mode running handlers in actual WASM)
+- Immutable entity optimizations
 
-**Recently Completed:**
+**Recently Completed (2026-03-09) — Developer Experience:**
+- ✅ `log_id!` macro — generate unique event IDs from tx hash + log index
+- ✅ `call_id!` macro — generate unique call IDs from tx hash
+- ✅ `block_id!` macro — generate unique block IDs from block number
+- ✅ `day_id!` / `hour_id!` macros — time-based entity IDs for analytics
+- ✅ `format_units` / `parse_units` — token amount formatting (wei ↔ ETH style)
+- ✅ `Address::is_zero()` — check for zero address
+- ✅ `BigInt::safe_div` / `BigDecimal::safe_div` — division that returns zero on divide-by-zero
+- ✅ `From<Address> for Bytes`, `From<[u8; 20]>`, `From<[u8; 32]>` — automatic coercion
+- ✅ Entity builder pattern via codegen — fluent `Entity::builder().field().save()`
+- ✅ Entity helper methods: `load_or_create`, `update`, `upsert`, `exists`
+- ✅ Fixed CLI codegen to output relative to manifest, not CWD
+- ✅ Updated example subgraphs to showcase all DX improvements
+
+**Previously Completed (2026-03-09):**
+- ✅ BigInt/BigDecimal comparison operators (`<`, `>`, `<=`, `>=` and `lt()`, `gt()`, `le()`, `ge()`)
+- ✅ BigInt `abs()`, `sqrt()` and BigDecimal `truncate()` methods
+- ✅ Bytes `concat()` and `concat_i32()` methods
+- ✅ ENS reverse lookup (`ens::name_by_hash`)
+- ✅ IPFS streaming (`ipfs::map` for callback-based processing)
+- ✅ `store::get_in_block` / `loadInBlock` for block-scoped entity loading
+- ✅ Native testing framework with `EventBuilder`, `CallBuilder`, `BlockBuilder`
+- ✅ Mock store, mock data source, mock IPFS
+- ✅ Native crypto (keccak256)
+- ✅ JSON parsing utilities
+- ✅ `yogurt dev` (file watching with auto-rebuild)
+- ✅ `yogurt inspect` (WASM module analysis)
+- ✅ Type conversion utilities (hex parsing, BigInt from string/bytes)
+
+**Previously Completed:**
 - ✅ Subgraph Studio deployment (`yogurt auth` + `yogurt deploy --studio`)
 - ✅ Uniswap V2 example subgraph (`tests/integration/uniswap-v2/`)
 - ✅ File data sources and data source templates

@@ -3,6 +3,8 @@
 #[allow(unused_imports)]
 use alloc::string::String;
 #[allow(unused_imports)]
+use alloc::string::ToString;
+#[allow(unused_imports)]
 use alloc::vec::Vec;
 use yogurt_runtime::prelude::*;
 use yogurt_runtime::store;
@@ -90,6 +92,100 @@ store::get(Self::ENTITY_TYPE, id).map(|data| Self { data })
 
 fn remove(id: &str) {
 store::remove(Self::ENTITY_TYPE, id);
+}
+
+fn create(id: impl Into<String>) -> Self {
+Self::new(id)
+}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl yogurt_runtime::testing::TestableEntity for Transfer {
+fn as_data(&self) -> &EntityData {
+&self.data
+}
+
+fn from_data(data: EntityData) -> Self {
+Self { data }
+}
+}
+
+/// Fluent builder for `Transfer` entities.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Transfer::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub struct TransferBuilder {
+inner: Transfer,
+}
+
+impl Transfer {
+/// Create a new builder for this entity type.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Transfer::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub fn builder(id: impl Into<String>) -> TransferBuilder {
+TransferBuilder {
+inner: Transfer::new(id),
+}
+}
+}
+
+impl TransferBuilder {
+    /// Set the `from` field.
+pub fn from(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_from(val);
+self
+}
+
+    /// Set the `to` field.
+pub fn to(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_to(val);
+self
+}
+
+    /// Set the `value` field.
+pub fn value(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_value(val);
+self
+}
+
+    /// Set the `blockNumber` field.
+pub fn block_number(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_block_number(val);
+self
+}
+
+    /// Set the `blockTimestamp` field.
+pub fn block_timestamp(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_block_timestamp(val);
+self
+}
+
+    /// Set the `transactionHash` field.
+pub fn transaction_hash(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_transaction_hash(val);
+self
+}
+
+    /// Consume the builder and return the constructed `Transfer`.
+pub fn build(self) -> Transfer {
+self.inner
+}
+
+/// Consume the builder, save the entity, and return it.
+pub fn save(self) -> Transfer {
+self.inner.save();
+self.inner
 }
 }
 

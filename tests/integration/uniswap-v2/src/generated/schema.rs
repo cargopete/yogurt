@@ -69,6 +69,82 @@ store::get(Self::ENTITY_TYPE, id).map(|data| Self { data })
 fn remove(id: &str) {
 store::remove(Self::ENTITY_TYPE, id);
 }
+
+fn create(id: impl Into<String>) -> Self {
+Self::new(id)
+}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl yogurt_runtime::testing::TestableEntity for Factory {
+fn as_data(&self) -> &EntityData {
+&self.data
+}
+
+fn from_data(data: EntityData) -> Self {
+Self { data }
+}
+}
+
+/// Fluent builder for `Factory` entities.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Factory::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub struct FactoryBuilder {
+inner: Factory,
+}
+
+impl Factory {
+/// Create a new builder for this entity type.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Factory::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub fn builder(id: impl Into<String>) -> FactoryBuilder {
+FactoryBuilder {
+inner: Factory::new(id),
+}
+}
+}
+
+impl FactoryBuilder {
+    /// Set the `pairCount` field.
+pub fn pair_count(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_pair_count(val);
+self
+}
+
+    /// Set the `totalVolumeETH` field.
+pub fn total_volume_eth(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_total_volume_eth(val);
+self
+}
+
+    /// Set the `totalLiquidityETH` field.
+pub fn total_liquidity_eth(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_total_liquidity_eth(val);
+self
+}
+
+    /// Consume the builder and return the constructed `Factory`.
+pub fn build(self) -> Factory {
+self.inner
+}
+
+/// Consume the builder, save the entity, and return it.
+pub fn save(self) -> Factory {
+self.inner.save();
+self.inner
+}
 }
 
 pub struct Token {
@@ -153,6 +229,100 @@ store::get(Self::ENTITY_TYPE, id).map(|data| Self { data })
 
 fn remove(id: &str) {
 store::remove(Self::ENTITY_TYPE, id);
+}
+
+fn create(id: impl Into<String>) -> Self {
+Self::new(id)
+}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl yogurt_runtime::testing::TestableEntity for Token {
+fn as_data(&self) -> &EntityData {
+&self.data
+}
+
+fn from_data(data: EntityData) -> Self {
+Self { data }
+}
+}
+
+/// Fluent builder for `Token` entities.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Token::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub struct TokenBuilder {
+inner: Token,
+}
+
+impl Token {
+/// Create a new builder for this entity type.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Token::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub fn builder(id: impl Into<String>) -> TokenBuilder {
+TokenBuilder {
+inner: Token::new(id),
+}
+}
+}
+
+impl TokenBuilder {
+    /// Set the `symbol` field.
+pub fn symbol(mut self, val: impl Into<String>) -> Self {
+self.inner.set_symbol(val);
+self
+}
+
+    /// Set the `name` field.
+pub fn name(mut self, val: impl Into<String>) -> Self {
+self.inner.set_name(val);
+self
+}
+
+    /// Set the `decimals` field.
+pub fn decimals(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_decimals(val);
+self
+}
+
+    /// Set the `totalSupply` field.
+pub fn total_supply(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_total_supply(val);
+self
+}
+
+    /// Set the `tradeVolume` field.
+pub fn trade_volume(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_trade_volume(val);
+self
+}
+
+    /// Set the `txCount` field.
+pub fn tx_count(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_tx_count(val);
+self
+}
+
+    /// Consume the builder and return the constructed `Token`.
+pub fn build(self) -> Token {
+self.inner
+}
+
+/// Consume the builder, save the entity, and return it.
+pub fn save(self) -> Token {
+self.inner.save();
+self.inner
 }
 }
 
@@ -254,6 +424,112 @@ store::get(Self::ENTITY_TYPE, id).map(|data| Self { data })
 
 fn remove(id: &str) {
 store::remove(Self::ENTITY_TYPE, id);
+}
+
+fn create(id: impl Into<String>) -> Self {
+Self::new(id)
+}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl yogurt_runtime::testing::TestableEntity for Pair {
+fn as_data(&self) -> &EntityData {
+&self.data
+}
+
+fn from_data(data: EntityData) -> Self {
+Self { data }
+}
+}
+
+/// Fluent builder for `Pair` entities.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Pair::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub struct PairBuilder {
+inner: Pair,
+}
+
+impl Pair {
+/// Create a new builder for this entity type.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Pair::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub fn builder(id: impl Into<String>) -> PairBuilder {
+PairBuilder {
+inner: Pair::new(id),
+}
+}
+}
+
+impl PairBuilder {
+    /// Set the `token0` field.
+pub fn token0(mut self, val: impl Into<String>) -> Self {
+self.inner.set_token0(val);
+self
+}
+
+    /// Set the `token1` field.
+pub fn token1(mut self, val: impl Into<String>) -> Self {
+self.inner.set_token1(val);
+self
+}
+
+    /// Set the `reserve0` field.
+pub fn reserve0(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_reserve0(val);
+self
+}
+
+    /// Set the `reserve1` field.
+pub fn reserve1(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_reserve1(val);
+self
+}
+
+    /// Set the `totalSupply` field.
+pub fn total_supply(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_total_supply(val);
+self
+}
+
+    /// Set the `txCount` field.
+pub fn tx_count(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_tx_count(val);
+self
+}
+
+    /// Set the `createdAtTimestamp` field.
+pub fn created_at_timestamp(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_created_at_timestamp(val);
+self
+}
+
+    /// Set the `createdAtBlockNumber` field.
+pub fn created_at_block_number(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_created_at_block_number(val);
+self
+}
+
+    /// Consume the builder and return the constructed `Pair`.
+pub fn build(self) -> Pair {
+self.inner
+}
+
+/// Consume the builder, save the entity, and return it.
+pub fn save(self) -> Pair {
+self.inner.save();
+self.inner
 }
 }
 
@@ -373,6 +649,124 @@ store::get(Self::ENTITY_TYPE, id).map(|data| Self { data })
 fn remove(id: &str) {
 store::remove(Self::ENTITY_TYPE, id);
 }
+
+fn create(id: impl Into<String>) -> Self {
+Self::new(id)
+}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl yogurt_runtime::testing::TestableEntity for Swap {
+fn as_data(&self) -> &EntityData {
+&self.data
+}
+
+fn from_data(data: EntityData) -> Self {
+Self { data }
+}
+}
+
+/// Fluent builder for `Swap` entities.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Swap::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub struct SwapBuilder {
+inner: Swap,
+}
+
+impl Swap {
+/// Create a new builder for this entity type.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Swap::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub fn builder(id: impl Into<String>) -> SwapBuilder {
+SwapBuilder {
+inner: Swap::new(id),
+}
+}
+}
+
+impl SwapBuilder {
+    /// Set the `pair` field.
+pub fn pair(mut self, val: impl Into<String>) -> Self {
+self.inner.set_pair(val);
+self
+}
+
+    /// Set the `timestamp` field.
+pub fn timestamp(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_timestamp(val);
+self
+}
+
+    /// Set the `sender` field.
+pub fn sender(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_sender(val);
+self
+}
+
+    /// Set the `amount0In` field.
+pub fn amount0_in(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount0_in(val);
+self
+}
+
+    /// Set the `amount1In` field.
+pub fn amount1_in(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount1_in(val);
+self
+}
+
+    /// Set the `amount0Out` field.
+pub fn amount0_out(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount0_out(val);
+self
+}
+
+    /// Set the `amount1Out` field.
+pub fn amount1_out(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount1_out(val);
+self
+}
+
+    /// Set the `to` field.
+pub fn to(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_to(val);
+self
+}
+
+    /// Set the `logIndex` field.
+pub fn log_index(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_log_index(val);
+self
+}
+
+    /// Set the `transaction` field.
+pub fn transaction(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_transaction(val);
+self
+}
+
+    /// Consume the builder and return the constructed `Swap`.
+pub fn build(self) -> Swap {
+self.inner
+}
+
+/// Consume the builder, save the entity, and return it.
+pub fn save(self) -> Swap {
+self.inner.save();
+self.inner
+}
 }
 
 /// Immutable entity — cannot be updated after first save (enforced by graph-node).
@@ -475,6 +869,112 @@ store::get(Self::ENTITY_TYPE, id).map(|data| Self { data })
 fn remove(id: &str) {
 store::remove(Self::ENTITY_TYPE, id);
 }
+
+fn create(id: impl Into<String>) -> Self {
+Self::new(id)
+}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl yogurt_runtime::testing::TestableEntity for Mint {
+fn as_data(&self) -> &EntityData {
+&self.data
+}
+
+fn from_data(data: EntityData) -> Self {
+Self { data }
+}
+}
+
+/// Fluent builder for `Mint` entities.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Mint::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub struct MintBuilder {
+inner: Mint,
+}
+
+impl Mint {
+/// Create a new builder for this entity type.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Mint::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub fn builder(id: impl Into<String>) -> MintBuilder {
+MintBuilder {
+inner: Mint::new(id),
+}
+}
+}
+
+impl MintBuilder {
+    /// Set the `pair` field.
+pub fn pair(mut self, val: impl Into<String>) -> Self {
+self.inner.set_pair(val);
+self
+}
+
+    /// Set the `timestamp` field.
+pub fn timestamp(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_timestamp(val);
+self
+}
+
+    /// Set the `sender` field.
+pub fn sender(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_sender(val);
+self
+}
+
+    /// Set the `amount0` field.
+pub fn amount0(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount0(val);
+self
+}
+
+    /// Set the `amount1` field.
+pub fn amount1(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount1(val);
+self
+}
+
+    /// Set the `to` field.
+pub fn to(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_to(val);
+self
+}
+
+    /// Set the `logIndex` field.
+pub fn log_index(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_log_index(val);
+self
+}
+
+    /// Set the `transaction` field.
+pub fn transaction(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_transaction(val);
+self
+}
+
+    /// Consume the builder and return the constructed `Mint`.
+pub fn build(self) -> Mint {
+self.inner
+}
+
+/// Consume the builder, save the entity, and return it.
+pub fn save(self) -> Mint {
+self.inner.save();
+self.inner
+}
 }
 
 /// Immutable entity — cannot be updated after first save (enforced by graph-node).
@@ -576,6 +1076,112 @@ store::get(Self::ENTITY_TYPE, id).map(|data| Self { data })
 
 fn remove(id: &str) {
 store::remove(Self::ENTITY_TYPE, id);
+}
+
+fn create(id: impl Into<String>) -> Self {
+Self::new(id)
+}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl yogurt_runtime::testing::TestableEntity for Burn {
+fn as_data(&self) -> &EntityData {
+&self.data
+}
+
+fn from_data(data: EntityData) -> Self {
+Self { data }
+}
+}
+
+/// Fluent builder for `Burn` entities.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Burn::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub struct BurnBuilder {
+inner: Burn,
+}
+
+impl Burn {
+/// Create a new builder for this entity type.
+///
+/// # Example
+///
+/// ```ignore
+/// let entity = Burn::builder("my-id")
+///     .field_name(value)
+///     .build();
+/// ```
+pub fn builder(id: impl Into<String>) -> BurnBuilder {
+BurnBuilder {
+inner: Burn::new(id),
+}
+}
+}
+
+impl BurnBuilder {
+    /// Set the `pair` field.
+pub fn pair(mut self, val: impl Into<String>) -> Self {
+self.inner.set_pair(val);
+self
+}
+
+    /// Set the `timestamp` field.
+pub fn timestamp(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_timestamp(val);
+self
+}
+
+    /// Set the `sender` field.
+pub fn sender(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_sender(val);
+self
+}
+
+    /// Set the `amount0` field.
+pub fn amount0(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount0(val);
+self
+}
+
+    /// Set the `amount1` field.
+pub fn amount1(mut self, val: impl Into<BigDecimal>) -> Self {
+self.inner.set_amount1(val);
+self
+}
+
+    /// Set the `to` field.
+pub fn to(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_to(val);
+self
+}
+
+    /// Set the `logIndex` field.
+pub fn log_index(mut self, val: impl Into<BigInt>) -> Self {
+self.inner.set_log_index(val);
+self
+}
+
+    /// Set the `transaction` field.
+pub fn transaction(mut self, val: impl Into<Bytes>) -> Self {
+self.inner.set_transaction(val);
+self
+}
+
+    /// Consume the builder and return the constructed `Burn`.
+pub fn build(self) -> Burn {
+self.inner
+}
+
+/// Consume the builder, save the entity, and return it.
+pub fn save(self) -> Burn {
+self.inner.save();
+self.inner
 }
 }
 

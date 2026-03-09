@@ -1,6 +1,7 @@
 //! Auto-generated data source templates — do not edit
 
 use alloc::string::ToString;
+use yogurt_runtime::prelude::Address;
 use yogurt_runtime::data_source;
 
 /// Data source template: `TokenMetadata`

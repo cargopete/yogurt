@@ -13,11 +13,15 @@ pub fn run(manifest_path: &str) -> Result<()> {
         anyhow::bail!("Manifest not found: {}", manifest_path);
     }
 
-    let output_dir = Path::new("src/generated");
+    // Output directory should be relative to the manifest, not the current directory
+    let output_dir = manifest
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join("src/generated");
 
     println!("  Reading {}...", manifest_path);
 
-    yogurt_codegen::generate(manifest, output_dir)?;
+    yogurt_codegen::generate(manifest, &output_dir)?;
 
     println!();
     println!("{}", style("✓ Code generation complete").green());
