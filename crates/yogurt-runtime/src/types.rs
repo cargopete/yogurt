@@ -279,7 +279,14 @@ pub struct BigInt {
 #[cfg(target_arch = "wasm32")]
 impl BigInt {
     /// Create a BigInt from an AscPtr (internal use).
+    ///
+    /// If the pointer is null, creates a BigInt with value zero to avoid
+    /// passing null pointers to graph-node host functions.
     pub fn from_ptr(ptr: AscPtr<crate::asc::AscBytes>) -> Self {
+        if ptr.is_null() {
+            // Create a proper zero value instead of wrapping null
+            return Self::from_i32(0);
+        }
         Self { ptr }
     }
 
@@ -327,6 +334,9 @@ impl BigInt {
 
     /// Convert to a decimal string representation.
     pub fn to_string(&self) -> String {
+        if self.ptr.is_null() {
+            return String::from("0");
+        }
         let str_ptr = unsafe { crate::host::big_int_to_string(self.ptr.as_i32()) };
         crate::asc::asc_to_string(AscPtr::new(str_ptr as u32))
     }
@@ -670,6 +680,9 @@ impl BigInt {
 
     /// Convert to hex string.
     pub fn to_hex(&self) -> String {
+        if self.ptr.is_null() {
+            return String::from("0x0");
+        }
         let str_ptr = unsafe { crate::host::big_int_to_hex(self.ptr.as_i32()) };
         crate::asc::asc_to_string(AscPtr::new(str_ptr as u32))
     }
@@ -1286,7 +1299,14 @@ pub struct BigDecimal {
 #[cfg(target_arch = "wasm32")]
 impl BigDecimal {
     /// Create a BigDecimal from an AscPtr (internal use).
+    ///
+    /// If the pointer is null, creates a BigDecimal with value zero to avoid
+    /// passing null pointers to graph-node host functions.
     pub fn from_ptr(ptr: AscPtr<crate::asc::AscBytes>) -> Self {
+        if ptr.is_null() {
+            // Create a proper zero value instead of wrapping null
+            return Self::from_string("0");
+        }
         Self { ptr }
     }
 
@@ -1316,6 +1336,9 @@ impl BigDecimal {
 
     /// Convert to a string representation.
     pub fn to_string(&self) -> String {
+        if self.ptr.is_null() {
+            return String::from("0");
+        }
         let str_ptr = unsafe { crate::host::big_decimal_to_string(self.ptr.as_i32()) };
         crate::asc::asc_to_string(AscPtr::new(str_ptr as u32))
     }

@@ -122,7 +122,7 @@ pub fn asc_alloc(_size: u32, _class_id: u32) -> u32 {
     panic!("asc_alloc not available on native target");
 }
 
-/// The `__new` export required by graph-node.
+/// The `__new` export required by graph-node (newer API).
 /// Signature: `(size: i32, classId: i32) -> i32`
 #[unsafe(no_mangle)]
 #[cfg(target_arch = "wasm32")]
@@ -131,14 +131,22 @@ pub extern "C" fn __new(size: i32, class_id: i32) -> i32 {
 }
 
 /// Read the rtId (runtime type ID) from an object's header
+#[inline(never)]
 pub unsafe fn read_rt_id(ptr: u32) -> u32 {
-    let header_ptr = (ptr - 8) as *const u32;
+    if ptr < 8 {
+        return 0;
+    }
+    let header_ptr = ptr.wrapping_sub(8) as *const u32;
     unsafe { core::ptr::read_unaligned(header_ptr) }
 }
 
 /// Read the rtSize (payload byte length) from an object's header
+#[inline(never)]
 pub unsafe fn read_rt_size(ptr: u32) -> u32 {
-    let header_ptr = (ptr - 4) as *const u32;
+    if ptr < 4 {
+        return 0;
+    }
+    let header_ptr = ptr.wrapping_sub(4) as *const u32;
     unsafe { core::ptr::read_unaligned(header_ptr) }
 }
 

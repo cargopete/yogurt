@@ -211,12 +211,26 @@ fn serialize_value(value: &Value) -> AscPtr<AscStoreValue> {
         Value::Int(i) => (StoreValueKind::Int, *i as u64),
         Value::Int8(i) => (StoreValueKind::Int8, *i as u64),
         Value::BigInt(bi) => {
+            // Ensure we have a valid pointer - if null, create a zero value
             let ptr = bi.as_ptr();
-            (StoreValueKind::BigInt, ptr.as_raw() as u64)
+            let valid_ptr = if ptr.is_null() {
+                // Allocate a zero BigInt (empty bytes = 0)
+                bytes_to_asc(&[0u8]).as_raw()
+            } else {
+                ptr.as_raw()
+            };
+            (StoreValueKind::BigInt, valid_ptr as u64)
         }
         Value::BigDecimal(bd) => {
+            // Ensure we have a valid pointer - if null, create a zero value
             let ptr = bd.as_ptr();
-            (StoreValueKind::BigDecimal, ptr.as_raw() as u64)
+            let valid_ptr = if ptr.is_null() {
+                // Allocate a zero BigDecimal string "0"
+                str_to_asc("0").as_raw()
+            } else {
+                ptr.as_raw()
+            };
+            (StoreValueKind::BigDecimal, valid_ptr as u64)
         }
         Value::Bool(b) => (StoreValueKind::Bool, if *b { 1 } else { 0 }),
         Value::Bytes(bytes) => {

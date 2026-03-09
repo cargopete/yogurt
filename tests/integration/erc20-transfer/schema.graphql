@@ -1,4 +1,4 @@
-type Transfer @entity {
+type Transfer @entity(immutable: true) {
   id: ID!
   from: Bytes!
   to: Bytes!

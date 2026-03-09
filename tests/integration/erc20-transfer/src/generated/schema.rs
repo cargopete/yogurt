@@ -10,6 +10,7 @@ use yogurt_runtime::prelude::*;
 use yogurt_runtime::store;
 use yogurt_runtime::types::{EntityData, Value};
 
+/// Immutable entity — cannot be updated after first save (enforced by graph-node).
 pub struct Transfer {
     data: EntityData,
 }

@@ -8,7 +8,7 @@
 
 extern crate alloc;
 
-mod allocator;
+pub(crate) mod allocator;
 pub mod asc;
 mod host;
 pub mod types;
@@ -231,4 +231,49 @@ mod wasm {
     /// We don't use RTTI, so this returns a null pointer.
     #[unsafe(no_mangle)]
     pub static __rtti_base: u32 = 0;
+
+    /// The `allocate` export required by graph-node.
+    /// This is the older allocation API that some versions of graph-node use.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn allocate(size: i32) -> i32 {
+        crate::allocator::asc_alloc(size as u32, 0) as i32
+    }
+
+    /// The `id_of_type` export required by graph-node.
+    /// Takes a pointer to a type name string and returns the class ID.
+    /// This is used by graph-node for runtime type identification.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn id_of_type(type_name_ptr: i32) -> i32 {
+        // Read the type name string from the pointer
+        let type_name = crate::asc::asc_to_string(crate::asc::AscPtr::new(type_name_ptr as u32));
+
+        // Match against known type names and return the class ID
+        match type_name.as_str() {
+            "ArrayBuffer" => crate::allocator::class_id::ARRAY_BUFFER as i32,
+            "String" => crate::allocator::class_id::STRING as i32,
+            s if s.starts_with("TypedMap<") => crate::allocator::class_id::TYPED_MAP as i32,
+            s if s.starts_with("TypedMapEntry<") => crate::allocator::class_id::TYPED_MAP_ENTRY as i32,
+            s if s.starts_with("~lib/array/Array<") && s.contains("store~Value") => {
+                crate::allocator::class_id::ARRAY_STORE_VALUE as i32
+            }
+            s if s.starts_with("~lib/array/Array<") => crate::allocator::class_id::ARRAY_PTR as i32,
+            s if s.contains("store~Value") || s.contains("StoreValue") => {
+                crate::allocator::class_id::STORE_VALUE as i32
+            }
+            s if s.contains("ethereum~Value") || s.contains("EthereumValue") => {
+                crate::allocator::class_id::ETHEREUM_VALUE as i32
+            }
+            _ => {
+                // Unknown type - return 0 (OBJECT) as fallback
+                0
+            }
+        }
+    }
+
+    /// The `_start` export - WASM module entry point.
+    /// Graph-node calls this to initialize the module.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn _start() {
+        // No initialization needed
+    }
 }

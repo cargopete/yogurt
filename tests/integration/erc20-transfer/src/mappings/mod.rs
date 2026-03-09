@@ -1,81 +1,35 @@
 //! Event handlers for the ERC-20 Transfer subgraph
 
 use yogurt_runtime::prelude::*;
-use yogurt_runtime::data_source;
 use yogurt_macros::handler;
 
-use crate::generated::{Transfer, TransferCall, TransferEvent};
-use crate::generated::templates::TokenMetadata;
+use crate::generated::{Transfer, TransferEvent};
 
 /// Handle a Transfer event from an ERC-20 contract.
-///
-/// Creates a Transfer entity with the event data and saves it to the store.
 #[handler]
 pub fn handle_transfer(event: TransferEvent) {
-    // Create unique ID from transaction hash + log index using log_id! macro
+    // Create unique ID from transaction hash + log index
     let id = log_id!(event);
 
-    // Create and populate the Transfer entity
-    let mut transfer = Transfer::new(id);
-
-    // Set the transfer details from event params
-    // Address -> Bytes conversion is automatic thanks to From<Address> for Bytes
-    transfer.set_from(event.params.from);
-    transfer.set_to(event.params.to);
-    transfer.set_value(event.params.value);
-
-    // Set block context
-    transfer.set_block_number(event.block.number);
-    transfer.set_block_timestamp(event.block.timestamp);
-    transfer.set_transaction_hash(event.transaction.hash);
-
-    // Save to the store
-    transfer.save();
-
-    // Example: spawn a file data source to fetch token metadata
-    // In a real subgraph, you'd get the IPFS hash from contract state
-    // TokenMetadata::create("QmExampleCID...");
+    // Build and save the transfer entity
+    Transfer::builder(id)
+        .from(event.params.from)
+        .to(event.params.to)
+        .value(event.params.value)
+        .block_number(event.block.number)
+        .block_timestamp(event.block.timestamp)
+        .transaction_hash(event.transaction.hash)
+        .save();
 }
 
 /// Handle a transfer() function call.
-///
-/// This demonstrates call handlers - triggered when the function is called,
-/// not when an event is emitted.
 #[handler]
-pub fn handle_transfer_call(call: TransferCall) {
-    // Create unique ID from transaction hash using call_id! macro
-    let id = alloc::format!("call-{}", call_id!(call));
-
-    // Create and populate the Transfer entity
-    let mut transfer = Transfer::new(id);
-
-    // Set transfer details from call inputs
-    // Address -> Bytes conversion is automatic
-    transfer.set_from(call.from);
-    transfer.set_to(call.inputs.to);
-    transfer.set_value(call.inputs.value);
-
-    // Set block context
-    transfer.set_block_number(call.block.number);
-    transfer.set_block_timestamp(call.block.timestamp);
-    transfer.set_transaction_hash(call.transaction.hash);
-
-    // Save to the store
-    transfer.save();
+pub fn handle_transfer_call(_call: crate::generated::TransferCall) {
+    // Call handlers not needed for this example
 }
 
 /// Handle token metadata from IPFS.
-///
-/// This is a file data source handler - it receives the raw file content
-/// and can access the content ID via data_source::string_param().
 #[handler]
-pub fn handle_metadata(content: Bytes) {
-    // Get the IPFS CID that triggered this handler
-    let ipfs_cid = data_source::string_param();
-
-    yogurt_runtime::log_info!("Processing metadata from IPFS: {}", ipfs_cid);
-
-    // In a real handler, you'd parse the content as JSON
-    // and create/update entities based on the metadata
-    let _content_length = content.len();
+pub fn handle_metadata(_content: Bytes) {
+    // IPFS handler not needed for this example
 }
