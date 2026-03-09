@@ -70,28 +70,35 @@ pub fn run(release: bool) -> Result<()> {
     // Create build directory
     fs::create_dir_all("build")?;
 
-    // Run wasm-opt if available (optional)
-    if release {
-        println!("  Running wasm-opt...");
-        let wasm_opt_result = Command::new("wasm-opt")
-            .arg("-Oz")
-            .arg(&wasm_path)
-            .arg("-o")
-            .arg("build/subgraph.wasm")
-            .status();
+    // Run wasm-opt with bulk memory lowering for graph-node compatibility
+    // Graph-node doesn't support WASM bulk memory operations (memory.copy, memory.fill)
+    // which modern Rust compilers emit. The --llvm-memory-copy-fill-lowering pass
+    // converts these to MVP-compatible loop-based implementations.
+    println!("  Running wasm-opt (bulk memory lowering)...");
+    let wasm_opt_result = Command::new("wasm-opt")
+        .arg("--enable-bulk-memory-opt")
+        .arg("--llvm-memory-copy-fill-lowering")
+        .arg(if release { "-Oz" } else { "-O1" })
+        .arg(&wasm_path)
+        .arg("-o")
+        .arg("build/subgraph.wasm")
+        .status();
 
-        match wasm_opt_result {
-            Ok(status) if status.success() => {}
-            _ => {
-                println!(
-                    "  {} wasm-opt not available, copying unoptimised",
-                    style("⚠").yellow()
-                );
-                fs::copy(&wasm_path, "build/subgraph.wasm")?;
-            }
+    match wasm_opt_result {
+        Ok(status) if status.success() => {
+            println!("  {} WASM optimised for graph-node compatibility", style("✓").green());
         }
-    } else {
-        fs::copy(&wasm_path, "build/subgraph.wasm")?;
+        _ => {
+            println!(
+                "  {} wasm-opt not available — install binaryen for graph-node compatibility",
+                style("✗").red()
+            );
+            println!(
+                "    {}",
+                style("brew install binaryen  # or apt-get install binaryen").dim()
+            );
+            fs::copy(&wasm_path, "build/subgraph.wasm")?;
+        }
     }
 
     // Get file size

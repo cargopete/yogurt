@@ -5,7 +5,7 @@
 You'll need:
 
 - **Rust 1.80+** with the `wasm32-unknown-unknown` target
-- **wasm-opt** (optional) for optimized release builds
+- **wasm-opt** (binaryen) for graph-node compatible WASM output
 
 ### Install Rust
 
@@ -21,9 +21,11 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustup target add wasm32-unknown-unknown
 ```
 
-### Install wasm-opt (Optional)
+### Install wasm-opt (Required)
 
-wasm-opt optimizes your WASM output for smaller binaries. Install via your package manager:
+wasm-opt (part of binaryen) is required to make WASM compatible with graph-node. Modern Rust compilers emit WASM bulk memory operations (`memory.copy`, `memory.fill`) that graph-node doesn't support. The `yogurt build` command automatically converts these to compatible code.
+
+Install via your package manager:
 
 ```bash
 # macOS

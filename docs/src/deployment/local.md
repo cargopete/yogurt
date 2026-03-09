@@ -4,6 +4,24 @@ Deploy to a local graph-node for development and testing.
 
 ## Prerequisites
 
+### Build Tools
+
+You need **binaryen** (provides `wasm-opt`) for graph-node compatible WASM:
+
+```bash
+# macOS
+brew install binaryen
+
+# Ubuntu/Debian
+apt-get install binaryen
+
+# Or download from https://github.com/WebAssembly/binaryen/releases
+```
+
+The `yogurt build` command uses wasm-opt to convert modern WASM features (bulk memory operations) to MVP-compatible code that graph-node supports.
+
+### Graph Node
+
 You need a running graph-node with:
 - **IPFS** — For storing subgraph files
 - **PostgreSQL** — For storing indexed data
