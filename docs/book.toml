@@ -11,8 +11,8 @@ build-dir = "book"
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "ayu"
-git-repository-url = "https://github.com/example/yogurt"
-edit-url-template = "https://github.com/example/yogurt/edit/main/docs/{path}"
+git-repository-url = "https://github.com/cargopete/yogurt"
+edit-url-template = "https://github.com/cargopete/yogurt/edit/main/docs/{path}"
 site-url = "/yogurt/"
 cname = ""
 additional-css = []
