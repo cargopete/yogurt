@@ -25,9 +25,9 @@ templates:
     source:
       abi: Pair
     mapping:
-      kind: rust/wasm
+      kind: ethereum/events
       apiVersion: 0.0.7
-      language: rust
+      language: wasm/assemblyscript
       entities:
         - Pair
         - Swap

@@ -54,7 +54,7 @@ std = ["yogurt-runtime/std"]
 The manifest defines your data sources, handlers, and schema:
 
 ```yaml
-specVersion: 0.0.5
+specVersion: 0.0.9
 schema:
   file: ./schema.graphql
 dataSources:
@@ -66,9 +66,9 @@ dataSources:
       abi: MyContract
       startBlock: 12345678
     mapping:
-      kind: rust/wasm
+      kind: ethereum/events
       apiVersion: 0.0.7
-      language: rust
+      language: wasm/assemblyscript
       entities:
         - MyEntity
       abis:
@@ -79,6 +79,8 @@ dataSources:
           handler: handleMyEvent
       file: ./build/subgraph.wasm
 ```
+
+> **Note:** yogurt uses `language: wasm/assemblyscript` because it produces binary-compatible WASM. Graph-node treats it identically to AssemblyScript subgraphs.
 
 ### `schema.graphql`
 

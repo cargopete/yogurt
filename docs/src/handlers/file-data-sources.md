@@ -16,10 +16,11 @@ In `subgraph.yaml`:
 templates:
   - kind: file/ipfs
     name: TokenMetadata
+    network: mainnet
     mapping:
-      kind: rust/wasm
+      kind: ethereum/events
       apiVersion: 0.0.7
-      language: rust
+      language: wasm/assemblyscript
       entities:
         - TokenMetadata
       abis: []

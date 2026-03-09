@@ -42,13 +42,15 @@ my-subgraph/
 Update `subgraph.yaml`:
 
 ```yaml
-# Change mapping section
+# Change the file path only — the rest stays the same!
 mapping:
-  kind: rust/wasm           # Was: wasm/assemblyscript
+  kind: ethereum/events
   apiVersion: 0.0.7
-  language: rust            # Was: wasm/assemblyscript
-  file: ./build/subgraph.wasm  # Was: ./src/mapping.ts
+  language: wasm/assemblyscript   # Keep this! yogurt is binary-compatible
+  file: ./build/subgraph.wasm     # Was: ./src/mapping.ts
 ```
+
+> **Key insight:** yogurt produces WASM that's binary-compatible with AssemblyScript, so graph-node treats it identically. You don't need to change `kind` or `language` — just point `file` to your compiled WASM.
 
 ## Type Mapping
 

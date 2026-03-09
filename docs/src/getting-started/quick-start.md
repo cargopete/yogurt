@@ -55,7 +55,7 @@ Place your contract ABI in `abis/ERC20.json`. For ERC-20, you need at least the 
 Edit `subgraph.yaml`:
 
 ```yaml
-specVersion: 0.0.5
+specVersion: 0.0.9
 schema:
   file: ./schema.graphql
 dataSources:
@@ -67,9 +67,9 @@ dataSources:
       abi: ERC20
       startBlock: 6082465
     mapping:
-      kind: rust/wasm
+      kind: ethereum/events
       apiVersion: 0.0.7
-      language: rust
+      language: wasm/assemblyscript
       entities:
         - Transfer
       abis:
@@ -80,6 +80,8 @@ dataSources:
           handler: handleTransfer
       file: ./build/subgraph.wasm
 ```
+
+> **Note:** We use `language: wasm/assemblyscript` because yogurt produces WASM binaries that are binary-compatible with AssemblyScript. Graph-node can't tell the difference!
 
 ## 5. Generate Types
 
