@@ -4,11 +4,11 @@ A Rust toolchain for The Graph subgraphs.
 
 Write your subgraph mapping handlers in Rust instead of AssemblyScript. yogurt compiles to WASM modules that are binary-compatible with graph-node's existing runtime — zero modifications required.
 
-> **March 2026:** The first-ever Rust subgraph was deployed to Subgraph Studio. Graph-node didn't even notice. 🎉
+> **March 2026:** The first-ever Rust subgraph was deployed to Subgraph Studio.
 
 ## Status
 
-✅ **Production ready** — full feature parity with AssemblyScript subgraphs.
+⚠️ This software is a POC and is purely for demo purposes.
 
 **Features:**
 - `yogurt init` — project scaffolding
