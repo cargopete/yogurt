@@ -60,6 +60,10 @@ reqwest = { version = "0.12", features = ["json", "multipart"] }
 thiserror = "2"
 anyhow = "1"
 
+# Crypto & utilities
+sha2 = "0.10"
+chrono = "0.4"
+
 # Testing
 pretty_assertions = "1"
 

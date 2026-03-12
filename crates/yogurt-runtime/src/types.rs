@@ -3,7 +3,8 @@
 //! These are the Rust equivalents of graph-ts types like `Address`, `BigInt`,
 //! `BigDecimal`, `Bytes`, and `Entity`.
 
-use alloc::collections::BTreeMap;
+// Note: We use Vec instead of BTreeMap for EntityData to avoid complex
+// pointer arithmetic that triggers graph-node's memory sanitization.
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -1992,27 +1993,37 @@ impl Value {
 }
 
 /// Entity data storage — a map of field names to values.
+///
+/// Uses a Vec internally instead of BTreeMap to avoid complex pointer
+/// arithmetic that triggers graph-node's memory sanitization.
 #[derive(Clone, Debug, Default)]
 pub struct EntityData {
-    fields: BTreeMap<String, Value>,
+    fields: Vec<(String, Value)>,
 }
 
 impl EntityData {
     /// Create a new empty entity data container.
     pub fn new() -> Self {
-        Self {
-            fields: BTreeMap::new(),
-        }
+        Self { fields: Vec::new() }
     }
 
-    /// Set a field value.
+    /// Set a field value. Updates existing key or appends new.
     pub fn set(&mut self, key: impl Into<String>, value: Value) {
-        self.fields.insert(key.into(), value);
+        let key = key.into();
+        // Check if key exists and update it
+        for (k, v) in &mut self.fields {
+            if k == &key {
+                *v = value;
+                return;
+            }
+        }
+        // Key not found, append
+        self.fields.push((key, value));
     }
 
     /// Get a field value.
     pub fn get(&self, key: &str) -> Option<&Value> {
-        self.fields.get(key)
+        self.fields.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
 
     /// Get a string field or panic.
@@ -2092,7 +2103,7 @@ impl EntityData {
 
     /// Iterate over all fields.
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
-        self.fields.iter()
+        self.fields.iter().map(|(k, v)| (k, v))
     }
 
     /// Get an array field.

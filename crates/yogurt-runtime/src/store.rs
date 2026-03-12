@@ -12,8 +12,8 @@ use alloc::vec::Vec;
 use crate::allocator::{asc_alloc, class_id, read_rt_size};
 use crate::asc::{
     asc_to_bytes, asc_to_string, bytes_to_asc, str_to_asc, AscArrayHeader, AscEnumHeader,
-    AscEntity, AscPtr, AscStoreValue, AscString, AscTypedMapEntry, AscTypedMapEntryHeader,
-    AscTypedMapHeader, StoreValueKind,
+    AscEntity, AscPtr, AscStoreValue, AscString, AscTypedArrayHeader, AscTypedMapEntry,
+    AscTypedMapEntryHeader, AscTypedMapHeader, StoreValueKind,
 };
 use crate::types::{BigDecimal, BigInt, Bytes, EntityData, Value};
 
@@ -152,10 +152,12 @@ pub fn serialize_entity(data: &EntityData) -> AscPtr<AscEntity> {
     );
 
     // Write Array header
+    // In AS, both buffer and buffer_data_start point to the data area
+    // buffer is a managed reference, buffer_data_start is used for element access
     unsafe {
         let header = array_ptr as *mut AscArrayHeader;
         (*header).buffer = buffer_ptr;
-        (*header).buffer_data_start = 0;
+        (*header).buffer_data_start = buffer_ptr;
         (*header).buffer_data_length = buffer_size;
         (*header).length = entry_count as i32;
     }
@@ -200,10 +202,30 @@ fn serialize_entry(
     AscPtr::new(entry_ptr)
 }
 
+/// Create a Uint8Array (TypedArray) wrapper around raw bytes.
+///
+/// Graph-node expects Bytes and BigInt values to be wrapped in a Uint8Array,
+/// NOT passed as raw ArrayBuffer pointers.
+#[cfg(target_arch = "wasm32")]
+fn make_typed_array(data: &[u8]) -> u32 {
+    let buffer_ptr = bytes_to_asc(data);
+    let typed_array_ptr = asc_alloc(
+        core::mem::size_of::<AscTypedArrayHeader>() as u32,
+        class_id::UINT8ARRAY,
+    );
+    unsafe {
+        let header = typed_array_ptr as *mut AscTypedArrayHeader;
+        (*header).buffer = buffer_ptr.as_raw();
+        (*header).data_start = buffer_ptr.as_raw();
+        (*header).byte_length = data.len() as u32;
+    }
+    typed_array_ptr
+}
+
 /// Serialize a Value to an AssemblyScript StoreValue enum.
 #[cfg(target_arch = "wasm32")]
 fn serialize_value(value: &Value) -> AscPtr<AscStoreValue> {
-    let (kind, payload) = match value {
+    let (kind, payload): (StoreValueKind, u64) = match value {
         Value::String(s) => {
             let ptr = str_to_asc(s);
             (StoreValueKind::String, ptr.as_raw() as u64)
@@ -211,15 +233,11 @@ fn serialize_value(value: &Value) -> AscPtr<AscStoreValue> {
         Value::Int(i) => (StoreValueKind::Int, *i as u64),
         Value::Int8(i) => (StoreValueKind::Int8, *i as u64),
         Value::BigInt(bi) => {
-            // Ensure we have a valid pointer - if null, create a zero value
-            let ptr = bi.as_ptr();
-            let valid_ptr = if ptr.is_null() {
-                // Allocate a zero BigInt (empty bytes = 0)
-                bytes_to_asc(&[0u8]).as_raw()
-            } else {
-                ptr.as_raw()
-            };
-            (StoreValueKind::BigInt, valid_ptr as u64)
+            // Graph-node expects BigInt as Uint8Array wrapper, NOT raw ArrayBuffer
+            // Extract the bytes and wrap in a TypedArray
+            let bytes = bi.to_signed_bytes();
+            let ptr = make_typed_array(&bytes);
+            (StoreValueKind::BigInt, ptr as u64)
         }
         Value::BigDecimal(bd) => {
             // Ensure we have a valid pointer - if null, create a zero value
@@ -234,8 +252,9 @@ fn serialize_value(value: &Value) -> AscPtr<AscStoreValue> {
         }
         Value::Bool(b) => (StoreValueKind::Bool, if *b { 1 } else { 0 }),
         Value::Bytes(bytes) => {
-            let ptr = bytes_to_asc(&bytes.0);
-            (StoreValueKind::Bytes, ptr.as_raw() as u64)
+            // Graph-node expects Bytes as Uint8Array wrapper, NOT raw ArrayBuffer
+            let ptr = make_typed_array(&bytes.0);
+            (StoreValueKind::Bytes, ptr as u64)
         }
         Value::Array(arr) => {
             let ptr = serialize_value_array(arr);
@@ -244,7 +263,7 @@ fn serialize_value(value: &Value) -> AscPtr<AscStoreValue> {
         Value::Null => (StoreValueKind::Null, 0),
     };
 
-    // Allocate enum struct
+    // Allocate enum struct (16 bytes: kind i32 + padding u32 + payload u64)
     let enum_ptr = asc_alloc(
         core::mem::size_of::<AscEnumHeader>() as u32,
         class_id::STORE_VALUE,
@@ -286,10 +305,11 @@ fn serialize_value_array(values: &[Value]) -> AscPtr<crate::asc::AscArray<AscSto
     );
 
     // Write Array header
+    // In AS, both buffer and buffer_data_start point to the data area
     unsafe {
         let header = array_ptr as *mut AscArrayHeader;
         (*header).buffer = buffer_ptr;
-        (*header).buffer_data_start = 0;
+        (*header).buffer_data_start = buffer_ptr;
         (*header).buffer_data_length = buffer_size;
         (*header).length = count as i32;
     }
@@ -363,13 +383,12 @@ fn deserialize_value(ptr: AscPtr<AscStoreValue>) -> Value {
     unsafe {
         let header = ptr.as_raw() as *const AscEnumHeader;
         let kind = (*header).kind;
-        let payload = (*header).payload;
+        let payload = (*header).payload; // u64, pointer in low 32 bits
 
         match kind {
             0 => {
                 // STRING
-                let str_ptr = AscPtr::new(payload as u32);
-                Value::String(asc_to_string(str_ptr))
+                Value::String(asc_to_string(AscPtr::new(payload as u32)))
             }
             1 => {
                 // INT
@@ -402,8 +421,8 @@ fn deserialize_value(ptr: AscPtr<AscStoreValue>) -> Value {
                 Value::BigInt(BigInt::from_ptr(AscPtr::new(payload as u32)))
             }
             8 => {
-                // INT8
-                Value::Int8(payload as i64)
+                // INT8 - sign-extend from i32 to i64
+                Value::Int8((payload as i32) as i64)
             }
             _ => Value::Null, // Unknown type, treat as null
         }

@@ -90,6 +90,10 @@ pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
         // WASM export wrapper
         #[unsafe(no_mangle)]
         pub extern "C" fn #wrapper_name(ptr: u32) {
+            // Guard against null pointer from graph-node
+            if ptr == 0 {
+                return;
+            }
             let #param_name = <#param_type as yogurt_runtime::asc::FromAscPtr>::from_asc_ptr(ptr);
             #fn_name(#param_name);
         }

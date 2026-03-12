@@ -149,12 +149,18 @@ pub struct AscTypedMapEntryHeader {
     pub value: u32,
 }
 
-/// AssemblyScript Enum layout (for StoreValue)
+/// AssemblyScript Enum layout (for StoreValue, EthereumValue, JsonValue)
 ///
 /// Memory layout (after 20-byte header):
 /// - kind: i32         (4 bytes) - discriminant
-/// - _padding: u32     (4 bytes) - alignment padding
-/// - payload: u64      (8 bytes) - value (pointer or inline primitive)
+/// - _padding: u32     (4 bytes) - explicit padding for alignment
+/// - payload: u64      (8 bytes) - value (pointer in low 32 bits, or inline primitive)
+///
+/// Total struct size: 16 bytes.
+///
+/// NOTE: Graph-node expects this exact 16-byte layout with explicit padding.
+/// The payload is u64 even though WASM32 pointers are 32-bit - the high
+/// 32 bits are unused but must be present for size validation.
 #[repr(C)]
 pub struct AscEnumHeader {
     pub kind: i32,
@@ -176,6 +182,24 @@ pub enum StoreValueKind {
     BigInt = 7,
     Int8 = 8,
     Timestamp = 9,
+}
+
+/// AssemblyScript TypedArray layout (Uint8Array, Int32Array, etc.)
+///
+/// Memory layout (after 20-byte header):
+/// - buffer: AscPtr<ArrayBuffer>  (4 bytes)
+/// - data_start: u32              (4 bytes) - pointer to start of data
+/// - byte_length: u32             (4 bytes)
+///
+/// Total struct size: 12 bytes.
+///
+/// NOTE: Bytes and BigInt in graph-node are backed by Uint8Array, which
+/// requires this TypedArray wrapper around the raw ArrayBuffer data.
+#[repr(C)]
+pub struct AscTypedArrayHeader {
+    pub buffer: u32,
+    pub data_start: u32,
+    pub byte_length: u32,
 }
 
 // ============================================================================
@@ -260,7 +284,7 @@ pub fn asc_to_string(_ptr: AscPtr<AscString>) -> String {
     panic!("asc_to_string not available on native target");
 }
 
-/// Convert a byte slice to an AssemblyScript Bytes (Uint8Array) in WASM memory.
+/// Convert a byte slice to an AssemblyScript ArrayBuffer in WASM memory.
 #[cfg(target_arch = "wasm32")]
 pub fn bytes_to_asc(data: &[u8]) -> AscPtr<AscBytes> {
     let len = data.len() as u32;
@@ -280,6 +304,10 @@ pub fn bytes_to_asc(_data: &[u8]) -> AscPtr<AscBytes> {
 }
 
 /// Convert an AssemblyScript Bytes from WASM memory to a Rust Vec<u8>.
+///
+/// This function handles both raw ArrayBuffer pointers and TypedArray (Uint8Array)
+/// wrappers. Graph-node passes TypedArray pointers for Bytes values in events,
+/// so we need to detect the type and read accordingly.
 #[cfg(target_arch = "wasm32")]
 pub fn asc_to_bytes(ptr: AscPtr<AscBytes>) -> Vec<u8> {
     if ptr.is_null() {
@@ -289,7 +317,31 @@ pub fn asc_to_bytes(ptr: AscPtr<AscBytes>) -> Vec<u8> {
     unsafe {
         let raw = ptr.as_raw();
         let rt_size = read_rt_size(raw);
+
+        // Detect TypedArray by checking if rtSize == 12 (size of TypedArray struct)
+        // AND the structure looks like a valid TypedArray header.
+        // TypedArray layout: buffer (u32), data_start (u32), byte_length (u32)
+        if rt_size == 12 {
+            let header = raw as *const AscTypedArrayHeader;
+            let data_start = (*header).data_start;
+            let byte_length = (*header).byte_length as usize;
+
+            // Validate: data_start should be non-zero, byte_length reasonable
+            if data_start != 0 && byte_length > 0 && byte_length < 1_000_000 {
+                let mut bytes = Vec::with_capacity(byte_length);
+                let src = data_start as *const u8;
+                for i in 0..byte_length {
+                    bytes.push(core::ptr::read(src.add(i)));
+                }
+                return bytes;
+            }
+        }
+
+        // Raw ArrayBuffer - read directly using rtSize
         let len = rt_size as usize;
+        if len == 0 || len > 1_000_000 {
+            return Vec::new();
+        }
 
         let mut bytes = Vec::with_capacity(len);
         let src = raw as *const u8;

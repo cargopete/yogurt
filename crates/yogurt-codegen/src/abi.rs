@@ -278,6 +278,10 @@ fn generate_call_struct(func: &ParsedFunction) -> String {
 ///
 /// The params come as Array<EventParam> from graph-node.
 /// Each EventParam has: name (offset 0), value (offset 4).
+/// The value field points to an ethereum.Value enum (graph-node's AscEnum):
+///   - kind (i32) at offset 0
+///   - _padding (u32) at offset 4
+///   - payload (u64) at offset 8 — pointer in low 32 bits
 fn generate_params_from_asc_ptr(struct_name: &str, params: &[FunctionParam]) -> String {
     if params.is_empty() {
         // Empty struct - trivial implementation
@@ -324,7 +328,7 @@ fn generate_params_from_asc_ptr(struct_name: &str, params: &[FunctionParam]) -> 
         "#[cfg(target_arch = \"wasm32\")]\n\
         impl FromAscPtr for {name} {{\n\
             fn from_asc_ptr(ptr: u32) -> Self {{\n\
-                use yogurt_runtime::asc::{{asc_to_bytes, read_u32_at, AscArrayHeader, AscPtr}};\n\
+                use yogurt_runtime::asc::{{asc_to_bytes, read_u32_at, read_u64_at, AscArrayHeader, AscPtr}};\n\
                 \n\
                 if ptr == 0 {{\n\
                     return Self::default();\n\
@@ -333,10 +337,20 @@ fn generate_params_from_asc_ptr(struct_name: &str, params: &[FunctionParam]) -> 
                 unsafe {{\n\
                     // ptr points to Array<EventParam>\n\
                     let array_header = ptr as *const AscArrayHeader;\n\
-                    let buffer_ptr = (*array_header).buffer;\n\
+                    // Use buffer_data_start, not buffer - buffer points to ArrayBuffer object,\n\
+                    // buffer_data_start points directly to the data\n\
+                    let buffer_ptr = (*array_header).buffer_data_start;\n\
+                    \n\
+                    // Defensive null check on buffer\n\
+                    if buffer_ptr == 0 {{\n\
+                        return Self::default();\n\
+                    }}\n\
                     \n\
                     // EventParam layout: name (offset 0), value (offset 4)\n\
+                    // value points to ethereum.Value enum (graph-node's AscEnum):\n\
+                    // kind (i32) + _padding (u32) + payload (u64)\n\
                     const EVENT_PARAM_VALUE_OFFSET: usize = 4;\n\
+                    const ETHEREUM_VALUE_DATA_OFFSET: usize = 8;\n\
                     \n\
 {field_extractions}\
                     Self {{ {field_list} }}\n\
@@ -364,54 +378,90 @@ fn generate_params_from_asc_ptr(struct_name: &str, params: &[FunctionParam]) -> 
 }
 
 /// Generate extraction code for a single field from EventParam array.
+///
+/// The EventParam.value field points to an ethereum.Value enum (graph-node's AscEnum):
+///   - kind (i32) at offset 0 — the type discriminant
+///   - _padding (u32) at offset 4
+///   - payload (u64) at offset 8 — pointer in low 32 bits
+///
+/// Each extraction includes null checks at every pointer level to prevent
+/// panics from invalid memory access.
 fn generate_field_extraction(field_name: &str, solidity_type: &str, index: usize, offset: usize) -> String {
-    let extraction = match solidity_type {
-        "address" => format!(
-            "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
-                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
-                             let {name}_bytes = asc_to_bytes(AscPtr::new({name}_value_ptr));\n\
-                             let {name} = Address::from({name}_bytes.as_slice());\n\n",
-            idx = index, offset = offset, name = field_name
+    // Generate null-safe pointer reads with default value fallback
+    let (default_value, value_extraction) = match solidity_type {
+        "address" => (
+            "Address::zero()",
+            format!(
+                "let {name}_bytes = asc_to_bytes(AscPtr::new({name}_payload));\n\
+                                 Address::from({name}_bytes.as_slice())",
+                name = field_name
+            ),
         ),
-        "bool" => format!(
-            "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
-                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
-                             let {name} = {name}_value_ptr != 0;\n\n",
-            idx = index, offset = offset, name = field_name
+        "bool" => (
+            "false",
+            format!("{name}_payload != 0", name = field_name),
         ),
-        "string" => format!(
-            "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
-                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
-                             let {name} = yogurt_runtime::asc::asc_to_string(AscPtr::new({name}_value_ptr));\n\n",
-            idx = index, offset = offset, name = field_name
+        "string" => (
+            "String::new()",
+            format!(
+                "yogurt_runtime::asc::asc_to_string(AscPtr::new({name}_payload as u32))",
+                name = field_name
+            ),
         ),
-        "bytes" => format!(
-            "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
-                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
-                             let {name} = Bytes::from_vec(asc_to_bytes(AscPtr::new({name}_value_ptr)));\n\n",
-            idx = index, offset = offset, name = field_name
+        "bytes" => (
+            "Bytes::new()",
+            format!(
+                "Bytes::from_vec(asc_to_bytes(AscPtr::new({name}_payload)))",
+                name = field_name
+            ),
         ),
-        t if t.starts_with("uint") || t.starts_with("int") => format!(
-            "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
-                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
-                             let {name} = BigInt::from_ptr(AscPtr::new({name}_value_ptr));\n\n",
-            idx = index, offset = offset, name = field_name
+        t if t.starts_with("uint") || t.starts_with("int") => (
+            "BigInt::zero()",
+            format!(
+                "BigInt::from_ptr(AscPtr::new({name}_payload))",
+                name = field_name
+            ),
         ),
-        t if t.starts_with("bytes") => format!(
-            "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
-                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
-                             let {name} = Bytes::from_vec(asc_to_bytes(AscPtr::new({name}_value_ptr)));\n\n",
-            idx = index, offset = offset, name = field_name
+        t if t.starts_with("bytes") => (
+            "Bytes::new()",
+            format!(
+                "Bytes::from_vec(asc_to_bytes(AscPtr::new({name}_payload)))",
+                name = field_name
+            ),
         ),
         // Default: treat as bytes
-        _ => format!(
-            "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
-                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
-                             let {name} = Bytes::from_vec(asc_to_bytes(AscPtr::new({name}_value_ptr)));\n\n",
-            idx = index, offset = offset, name = field_name
+        _ => (
+            "Bytes::new()",
+            format!(
+                "Bytes::from_vec(asc_to_bytes(AscPtr::new({name}_payload)))",
+                name = field_name
+            ),
         ),
     };
-    extraction
+
+    // For bool, we use the raw u64 payload directly; for others we cast to u32
+    let payload_cast = if solidity_type == "bool" { "" } else { " as u32" };
+
+    format!(
+        "                    let param{idx}_ptr = read_u32_at(buffer_ptr, {offset});\n\
+                         let {name} = if param{idx}_ptr == 0 {{\n\
+                             {default}\n\
+                         }} else {{\n\
+                             let {name}_value_ptr = read_u32_at(param{idx}_ptr, EVENT_PARAM_VALUE_OFFSET);\n\
+                             if {name}_value_ptr == 0 {{\n\
+                                 {default}\n\
+                             }} else {{\n\
+                                 let {name}_payload = read_u64_at({name}_value_ptr, ETHEREUM_VALUE_DATA_OFFSET){cast};\n\
+                                 {extraction}\n\
+                             }}\n\
+                         }};\n\n",
+        idx = index,
+        offset = offset,
+        name = field_name,
+        default = default_value,
+        cast = payload_cast,
+        extraction = value_extraction,
+    )
 }
 
 /// Get the default value for a Solidity type.

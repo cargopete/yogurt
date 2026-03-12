@@ -8,10 +8,11 @@
 
 extern crate alloc;
 
-pub(crate) mod allocator;
+pub mod allocator;
 pub mod asc;
 mod host;
 pub mod types;
+// mod type_ids;  // TypeId exports - disabled, need to add via WASM post-processing
 
 pub mod crypto;
 pub mod data_source;
@@ -244,6 +245,11 @@ mod wasm {
     /// This is used by graph-node for runtime type identification.
     #[unsafe(no_mangle)]
     pub extern "C" fn id_of_type(type_name_ptr: i32) -> i32 {
+        // Guard against null pointer - graph-node may probe with 0
+        if type_name_ptr == 0 {
+            return 0;
+        }
+
         // Read the type name string from the pointer
         let type_name = crate::asc::asc_to_string(crate::asc::AscPtr::new(type_name_ptr as u32));
 

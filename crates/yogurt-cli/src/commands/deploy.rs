@@ -53,13 +53,9 @@ pub async fn run(
         );
     }
 
-    // Check that build exists
-    if !Path::new("build/subgraph.wasm").exists() {
-        anyhow::bail!(
-            "No build found at build/subgraph.wasm.\n\
-             Run `yogurt build` first."
-        );
-    }
+    // Verify WASM integrity (checks existence, size, and hash)
+    crate::commands::build::verify_wasm_integrity()?;
+    println!("  {} WASM integrity verified", style("✓").green());
 
     if studio {
         // Studio deployment requires a version label

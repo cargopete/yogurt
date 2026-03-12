@@ -173,10 +173,11 @@ fn strings_to_asc_array(strings: &[String]) -> u32 {
         class_id::ARRAY_PTR,
     );
 
+    // In AS, both buffer and buffer_data_start point to the data area
     unsafe {
         let header = array_ptr as *mut AscArrayHeader;
         (*header).buffer = buffer_ptr;
-        (*header).buffer_data_start = 0;
+        (*header).buffer_data_start = buffer_ptr;
         (*header).buffer_data_length = buffer_size;
         (*header).length = count as i32;
     }

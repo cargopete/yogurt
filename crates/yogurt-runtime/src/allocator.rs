@@ -19,25 +19,33 @@ pub const HEADER_SIZE: u32 = 20;
 
 /// Hardcoded AssemblyScript runtime type IDs
 ///
-/// The first three are fixed by the AS runtime. Others are assigned
-/// sequentially by the compiler, but we use stable IDs for our generated types.
+/// These MUST match graph-node's IndexForAscTypeId enum exactly!
+/// See: graph-node/graph/src/runtime/mod.rs
 pub mod class_id {
-    pub const OBJECT: u32 = 0;
+    // Core AS types (fixed by runtime)
+    pub const STRING: u32 = 0;
     pub const ARRAY_BUFFER: u32 = 1;
-    pub const STRING: u32 = 2;
 
-    // Array types - IDs chosen to avoid conflicts with codegen
-    // These start at a high number to leave room for user-defined types
-    pub const ARRAY_PTR: u32 = 1000;           // Array<AscPtr<T>>
-    pub const TYPED_MAP: u32 = 1001;           // TypedMap<K, V>
-    pub const TYPED_MAP_ENTRY: u32 = 1002;     // TypedMapEntry<K, V>
-    pub const STORE_VALUE: u32 = 1003;         // Enum<StoreValueKind>
-    pub const ARRAY_STORE_VALUE: u32 = 1004;   // Array<StoreValue>
+    // TypedArray types (from IndexForAscTypeId)
+    pub const INT64ARRAY: u32 = 5;
+    pub const UINT8ARRAY: u32 = 6;  // For Bytes and BigInt
 
-    // Ethereum types
-    pub const SMART_CONTRACT_CALL: u32 = 1010; // ethereum.SmartContractCall
-    pub const ETHEREUM_VALUE: u32 = 1011;      // ethereum.Value (enum)
-    pub const ARRAY_ETHEREUM_VALUE: u32 = 1012; // Array<ethereum.Value>
+    // Graph-node specific type IDs (from IndexForAscTypeId)
+    pub const ARRAY_STORE_VALUE: u32 = 16;                      // ArrayStoreValue
+    pub const ARRAY_TYPED_MAP_ENTRY_STRING_STORE_VALUE: u32 = 21; // ArrayTypedMapEntryStringStoreValue
+    pub const STORE_VALUE: u32 = 31;                            // StoreValue enum
+    pub const TYPED_MAP_ENTRY_STRING_STORE_VALUE: u32 = 34;     // TypedMapEntryStringStoreValue
+    pub const TYPED_MAP_STRING_STORE_VALUE: u32 = 36;           // TypedMapStringStoreValue (Entity)
+
+    // Aliases for backwards compatibility
+    pub const ARRAY_PTR: u32 = ARRAY_TYPED_MAP_ENTRY_STRING_STORE_VALUE;
+    pub const TYPED_MAP: u32 = TYPED_MAP_STRING_STORE_VALUE;
+    pub const TYPED_MAP_ENTRY: u32 = TYPED_MAP_ENTRY_STRING_STORE_VALUE;
+
+    // Ethereum types (from IndexForAscTypeId)
+    pub const ARRAY_ETHEREUM_VALUE: u32 = 15;  // ArrayEthereumValue
+    pub const SMART_CONTRACT_CALL: u32 = 22;   // SmartContractCall
+    pub const ETHEREUM_VALUE: u32 = 30;        // EthereumValue enum
 }
 
 /// Current heap pointer for bump allocation
@@ -133,7 +141,10 @@ pub extern "C" fn __new(size: i32, class_id: i32) -> i32 {
 /// Read the rtId (runtime type ID) from an object's header
 #[inline(never)]
 pub unsafe fn read_rt_id(ptr: u32) -> u32 {
-    if ptr < 8 {
+    // Valid AS objects have 20-byte headers, so minimum valid ptr is HEADER_SIZE.
+    // Guard against any pointer that would result in reading from address < 0
+    // after subtracting the header offset (8 bytes back for rtId).
+    if ptr < HEADER_SIZE {
         return 0;
     }
     let header_ptr = ptr.wrapping_sub(8) as *const u32;
@@ -143,7 +154,10 @@ pub unsafe fn read_rt_id(ptr: u32) -> u32 {
 /// Read the rtSize (payload byte length) from an object's header
 #[inline(never)]
 pub unsafe fn read_rt_size(ptr: u32) -> u32 {
-    if ptr < 4 {
+    // Valid AS objects have 20-byte headers, so minimum valid ptr is HEADER_SIZE.
+    // Guard against any pointer that would result in reading from address < 0
+    // after subtracting the header offset (4 bytes back for rtSize).
+    if ptr < HEADER_SIZE {
         return 0;
     }
     let header_ptr = ptr.wrapping_sub(4) as *const u32;

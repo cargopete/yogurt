@@ -562,10 +562,11 @@ fn serialize_token_array(tokens: &[Token]) -> u32 {
         class_id::ARRAY_ETHEREUM_VALUE,
     );
 
+    // In AS, both buffer and buffer_data_start point to the data area
     unsafe {
         let header = array_ptr as *mut AscArrayHeader;
         (*header).buffer = buffer_ptr;
-        (*header).buffer_data_start = 0;
+        (*header).buffer_data_start = buffer_ptr;
         (*header).buffer_data_length = buffer_size;
         (*header).length = count as i32;
     }
@@ -580,10 +581,10 @@ fn serialize_token(token: &Token) -> u32 {
     use crate::asc::{str_to_asc, bytes_to_asc, AscEnumHeader};
     use crate::allocator::{asc_alloc, class_id};
 
-    // EthereumValue enum layout (same as StoreValue):
-    // - kind: i32
-    // - _padding: u32
-    // - payload: u64
+    // EthereumValue enum layout (16 bytes, same as StoreValue):
+    // - kind: i32 (offset 0)
+    // - _padding: u32 (offset 4)
+    // - payload: u64 (offset 8)
 
     // EthereumValue kinds (from graph-ts):
     // ADDRESS = 0, FIXED_BYTES = 1, BYTES = 2, INT = 3, UINT = 4,
@@ -629,6 +630,7 @@ fn serialize_token(token: &Token) -> u32 {
         }
     };
 
+    // Allocate enum struct (16 bytes: kind i32 + _padding u32 + payload u64)
     let enum_ptr = asc_alloc(
         core::mem::size_of::<AscEnumHeader>() as u32,
         class_id::ETHEREUM_VALUE,
